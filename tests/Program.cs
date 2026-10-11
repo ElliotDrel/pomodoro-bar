@@ -106,11 +106,14 @@ internal static class Tests
         var app=new Application { ShutdownMode=ShutdownMode.OnExplicitShutdown };
         double now=0; var audio=new FakeAudio();
         using var host=new AppHost(new Settings(),Path.Combine(scratch,"gui.json"),audio,()=>now,services:false);
+        Pump();
+        Check(host.Bar.IsVisible && host.Editor.IsVisible,"startup opens both windows by default");
+        Check(host.CanAutoRestart,"default editor visibility does not count as user interaction");
         host.OpenEditor(); Pump();
         double width=host.Bar.Width,height=host.Bar.Height;
         Check(host.Bar.Topmost && host.Bar.WindowStyle==WindowStyle.None,"native always-on-top borderless window");
         Check(host.Editor.IsVisible && host.Bar.Width==width && host.Bar.Height==height,"editor independent of bar geometry");
-        Check(host.Bar.ShowInTaskbar && !host.Editor.ShowInTaskbar,"two windows share one taskbar entry");
+        Check(host.Bar.ShowInTaskbar && host.Editor.ShowInTaskbar && host.Bar.Owner is null && host.Editor.Owner is null,"both windows are independently available in the taskbar");
         foreach(var window in new Window[] {host.Bar,host.Editor}) {
             Check(ReferenceEquals(window.Icon,AppIcon.Source),"window uses the bundled Pomodoro icon");
             var hwnd=new WindowInteropHelper(window).Handle;
@@ -123,9 +126,9 @@ internal static class Tests
         host.SetSession(30,[40,20]); host.Toggle(); now=900; host.Tick(); Check(audio.Last=="second-last" && !audio.Loop,"native host reminder dispatch");
         now=1500; host.Tick(); Check(audio.Last=="complete" && audio.Loop,"completion loops");
         host.Bar.Hide();host.Render();Check(host.Editor.AlarmButton.Visibility==Visibility.Visible,"hidden-bar completion is acknowledgeable");
-        Check(!host.Bar.ShowInTaskbar && host.Editor.ShowInTaskbar,"hidden bar transfers taskbar entry to editor");
+        Check(host.Editor.ShowInTaskbar,"hiding bar preserves editor taskbar entry");
         host.Bar.Show();
-        Check(host.Bar.ShowInTaskbar && !host.Editor.ShowInTaskbar,"showing bar restores one taskbar entry");
+        Check(host.Bar.ShowInTaskbar && host.Editor.ShowInTaskbar,"showing bar preserves both taskbar windows");
         host.Silence(); Check(audio.Last is null && host.Timer.Waiting,"interaction silences without automatically advancing");
         host.Skip(); Check(!host.Timer.IsFocus && host.Timer.Running,"skip acknowledgement");
         host.Bar.Hide();host.Render();Check(host.Timer.Running && host.Editor.IsVisible && host.Editor.ShowBar.IsChecked==false,"hidden bar independent of editor and clock");
@@ -172,11 +175,14 @@ internal static class Tests
         Check(!host.Closing && host.Bar.IsVisible && !host.Editor.IsVisible && host.Timer.Running,"closing editor leaves bar and timer running");
         host.OpenEditor();host.Bar.Close();Pump();
         Check(!host.Closing && !host.Bar.IsVisible && host.Editor.IsVisible && host.Timer.Running,"closing bar leaves editor and timer running");
-        Check(host.Editor.ShowInTaskbar && !host.Bar.ShowInTaskbar,"closing bar preserves editor taskbar access");
+        Check(host.Editor.ShowInTaskbar,"closing bar preserves editor taskbar access");
         host.Editor.Close();Pump();
         Check(!host.Closing && host.Timer.Running && !host.Bar.IsVisible && !host.Editor.IsVisible,"closing both windows keeps app running");
-        host.OpenEditor();host.Bar.Show();Pump();
-        Check(host.Editor.IsVisible && host.Bar.IsVisible,"closed windows can be reopened");
+        host.ShowApp();Pump();
+        Check(host.Editor.IsVisible && host.Bar.IsVisible,"relaunch reopens both windows");
+        host.Editor.WindowState=WindowState.Minimized;host.Bar.WindowState=WindowState.Minimized;
+        host.ShowApp();Pump();
+        Check(host.Editor.WindowState==WindowState.Normal && host.Bar.WindowState==WindowState.Normal,"relaunch restores both minimized windows");
         host.Quit();Pump();Check(host.Closing,"explicit Quit exits both windows");
         host.Dispose();app.Shutdown();
     }

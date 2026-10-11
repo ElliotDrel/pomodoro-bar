@@ -6,7 +6,7 @@ Native C#/.NET 10 Windows app: WPF windows, WinForms tray, Velopack installer/up
 
 ## Preserve
 
-- One app and one desktop shortcut named Pomodoro Bar. Only one visible window supplies the taskbar entry; hiding the bar keeps the editor independently accessible.
+- One app and one desktop shortcut named Pomodoro Bar. Both independent windows appear in the taskbar and Alt+Tab; startup and relaunch show both. Do not suppress either window's taskbar presence.
 - Closing either window hides only that window. Quit alone exits the app; both windows can be reopened through tray/relaunch.
 
 - Uniformly scale circle, countdown, controls, and hit targets down to 130 × 20 DIPs.

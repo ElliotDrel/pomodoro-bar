@@ -36,11 +36,9 @@ internal sealed class AppHost : IDisposable
         save = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
         save.Tick += (_,_) => { save.Stop(); Save(); };
         Bar = new BarWindow(this); Editor = new EditorWindow(this);
-        Bar.IsVisibleChanged += (_,_) => SyncTaskbar();
-        Editor.IsVisibleChanged += (_,_) => SyncTaskbar();
         tick = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
         tick.Tick += (_,_) => Tick();
-        Bar.Show(); tick.Start();
+        Bar.Show(); ShowEditor(); tick.Start();
         if (services) {
             if (!smoke) {
                 updates = new UpdateService();
@@ -68,7 +66,7 @@ internal sealed class AppHost : IDisposable
             if (!smoke) server = new InstanceServer(command => Application.Current.Dispatcher.InvokeAsync(() => {
                 if (command == "restart") { Log.Write("restart_command_received"); return Restart(); }
                 if (command == "quit") { RequestQuit(); return true; }
-                OpenEditor(); return true;
+                ShowApp(); return true;
             }).Task);
             if (!smoke) { _ = updates!.CheckAsync(UpdateTrigger.Launch); Log.Write("started"); }
         }
@@ -107,22 +105,26 @@ internal sealed class AppHost : IDisposable
         sessionTouched = true; Timer.SetTime(seconds); Silence(); pulseUntil = 0;
         Settings = Settings with { Focus = Timer.Focus, Rest = Timer.Rest }; Save(); Render();
     }
-    private void SyncTaskbar()
-    {
-        // One taskbar entry for the app. Keep the windows independent so hiding
-        // or minimizing the bar never hides the editor through owner semantics.
-        Editor.ShowInTaskbar = Editor.IsVisible && !Bar.IsVisible;
-        Bar.ShowInTaskbar = Bar.IsVisible;
-    }
     public void Render() { Bar.Surface.InvalidateVisual(); Editor.Sync(); }
+    public void ShowApp()
+    {
+        Bar.Show();
+        if (Bar.WindowState == WindowState.Minimized) Bar.WindowState = WindowState.Normal;
+        OpenEditor();
+    }
     public void OpenEditor()
     {
         sessionTouched = true;
+        ShowEditor();
+    }
+    private void ShowEditor()
+    {
         if (!Editor.IsVisible) {
             Editor.Left = SystemParameters.WorkArea.Left + (SystemParameters.WorkArea.Width-Editor.Width)/2;
             Editor.Top = SystemParameters.WorkArea.Top + (SystemParameters.WorkArea.Height-Editor.Height)/2;
             Editor.Show(); Editor.CancelEdit(); System.Windows.Input.Keyboard.ClearFocus();
         }
+        if (Editor.WindowState == WindowState.Minimized) Editor.WindowState = WindowState.Normal;
         Editor.Activate(); Render();
     }
     public void ScheduleSave() { if (Closing) return; save.Stop(); save.Start(); }

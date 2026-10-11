@@ -17,11 +17,11 @@ Production uses Velopack, matching Universal Spell Check's release flow. It chec
 - **Pencil:** open the independent editor centered on the primary screen.
 - **Drag:** move the bar by its digits or background. Right-click for edit, reset, and quit.
 
-Any bar interaction silences audio. Digits and pencil leave completion flashing; circle, play, and skip also acknowledge completion. The editor shows an acknowledgement button at completion, including when the bar is hidden; the tray also offers **Silence alarm**. Launching again or double-clicking the tray icon reopens the existing editor even when both windows are hidden.
+Any bar interaction silences audio. Digits and pencil leave completion flashing; circle, play, and skip also acknowledge completion. The editor shows an acknowledgement button at completion, including when the bar is hidden; the tray also offers **Silence alarm**. Launching again reopens both windows; double-clicking the tray icon reopens the editor even when both windows are hidden.
 
 ## Editor
 
-Pomodoro Bar is one app with two independent windows. Opening the editor keeps a single taskbar entry; hiding the bar transfers that entry to the editor. Installation provides one desktop shortcut named **Pomodoro Bar** and removes the obsolete **Pomodoro Timer** shortcut when it targets this app.
+Pomodoro Bar is one app with two independent windows, each available in the taskbar and Alt+Tab. Startup opens both the time-setting editor and floating bar. Launching the app again reopens both hidden windows and restores minimized windows without resetting the timer. Installation provides one desktop shortcut named **Pomodoro Bar** and removes the obsolete **Pomodoro Timer** shortcut when it targets this app.
 
 Closing either window hides only that window and keeps the timer running. Reopen the bar from the tray's **Show floating bar** menu; reopen the editor by launching Pomodoro Bar again or double-clicking its tray icon. **Quit** exits the entire app.
 
