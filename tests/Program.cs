@@ -3,6 +3,8 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Runtime.InteropServices;
+using System.Windows.Interop;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -14,6 +16,8 @@ using PomodoroBar.Core;
 
 internal static class Tests
 {
+    [DllImport("user32.dll", CharSet=CharSet.Unicode)]
+    private static extern IntPtr SendMessage(IntPtr window,uint message,IntPtr wParam,IntPtr lParam);
     private static int count;
     private static void Check(bool value,string reason) { if (!value) throw new Exception(reason); count++; }
     private static void Near(double a,double b,string reason) => Check(Math.Abs(a-b)<.001,reason);
@@ -106,6 +110,12 @@ internal static class Tests
         double width=host.Bar.Width,height=host.Bar.Height;
         Check(host.Bar.Topmost && host.Bar.WindowStyle==WindowStyle.None,"native always-on-top borderless window");
         Check(host.Editor.IsVisible && host.Bar.Width==width && host.Bar.Height==height,"editor independent of bar geometry");
+        foreach(var window in new Window[] {host.Bar,host.Editor}) {
+            Check(ReferenceEquals(window.Icon,AppIcon.Source),"window uses the bundled Pomodoro icon");
+            var hwnd=new WindowInteropHelper(window).Handle;
+            Check(SendMessage(hwnd,0x007f,new IntPtr(0),IntPtr.Zero)!=IntPtr.Zero,"Windows receives small taskbar icon");
+            Check(SendMessage(hwnd,0x007f,new IntPtr(1),IntPtr.Zero)!=IntPtr.Zero,"Windows receives large window icon");
+        }
         Check(!host.CanAutoRestart,"opening editor defers startup updates");
         host.SetSession(60,[60,20,10]); Near(host.Timer.Focus,3000,"60 preset"); Near(host.Timer.Rest,600,"60 break");
         host.AddMinutes(1);host.AddMinutes(5);host.AddMinutes(10); Near(host.Timer.Focus+host.Timer.Rest,76*60,"add buttons"); Near(host.Timer.Focus/host.Timer.Rest,5,"5:1 ratio");
@@ -139,12 +149,13 @@ internal static class Tests
             host.Bar.Width=130;host.Bar.Height=20;Pump();Capture(host.Bar,Path.Combine(root,"bar-tiny.png"));
         }
         int calls=0;
+        string testPipe = "PomodoroBar.Tests." + Guid.NewGuid().ToString("N");
         using(var server=new InstanceServer(command=> {
             calls++; if(calls==1) throw new InvalidOperationException("simulated connection handler failure");
             return Task.FromResult(command=="show");
-        })) {
+        },testPipe)) {
             bool Send(string command) {
-                var request=InstanceServer.Send(command);
+                var request=InstanceServer.Send(command,testPipe);
                 var deadline=DateTime.UtcNow.AddSeconds(10);
                 while(!request.IsCompleted && DateTime.UtcNow<deadline) Pump();
                 Check(request.IsCompleted,"IPC bounded completion");return request.GetAwaiter().GetResult();

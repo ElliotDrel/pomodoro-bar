@@ -19,6 +19,7 @@ internal sealed class BarWindow : Window
     {
         this.host = host;
         Title = BuildChannel.DisplayName;
+        Icon = AppIcon.Source;
         WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.NoResize;
         Topmost = true; ShowInTaskbar = true; Background = BarSurface.Brush("#171c28");
         MinWidth = 130; MinHeight = 20; MaxWidth = 1000; MaxHeight = 120;

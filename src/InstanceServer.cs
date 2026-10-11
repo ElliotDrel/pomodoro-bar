@@ -10,12 +10,15 @@ internal sealed class InstanceServer : IDisposable
 {
     private readonly CancellationTokenSource stop = new();
     private readonly Func<string, Task<bool>> handler;
-    public InstanceServer(Func<string, Task<bool>> handler) { this.handler = handler; _ = Listen(); }
+    private readonly string pipeName;
+    public InstanceServer(Func<string, Task<bool>> handler, string? pipeName = null) {
+        this.handler = handler; this.pipeName = pipeName ?? BuildChannel.PipeName; _ = Listen();
+    }
     private async Task Listen()
     {
         while (!stop.IsCancellationRequested) {
             try {
-                using var pipe = new NamedPipeServerStream(BuildChannel.PipeName, PipeDirection.InOut, 1,
+                using var pipe = new NamedPipeServerStream(pipeName, PipeDirection.InOut, 1,
                     PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
                 await pipe.WaitForConnectionAsync(stop.Token);
                 using var reader = new StreamReader(pipe, leaveOpen: true);
@@ -32,10 +35,10 @@ internal sealed class InstanceServer : IDisposable
             }
         }
     }
-    public static async Task<bool> Send(string command)
+    public static async Task<bool> Send(string command, string? pipeName = null)
     {
         try {
-            using var pipe = new NamedPipeClientStream(".", BuildChannel.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+            using var pipe = new NamedPipeClientStream(".", pipeName ?? BuildChannel.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             await pipe.ConnectAsync(timeout.Token);
             using var writer = new StreamWriter(pipe, leaveOpen: true) { AutoFlush = true };
