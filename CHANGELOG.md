@@ -8,15 +8,23 @@ See [the request checklist](REQUEST-CHECKLIST.md) for the complete feature revie
 
 ## [Unreleased]
 
+- No pending changes.
+
+## [1.1.5] - 2026-10-11
+
+Channel: Prod. [Release](https://github.com/ElliotDrel/pomodoro-bar/releases/tag/v1.1.5) · [Changes since 1.1.4](https://github.com/ElliotDrel/pomodoro-bar/compare/v1.1.4...v1.1.5).
+
 ### Added
 
+- Show the current section's estimated end time beneath the editor countdown, updating immediately as a valid duration is typed and as presets/countdown change. Round the resulting clock time to the nearest minute, with 30-second ties rounded forward and next-day dates labeled.
+- Distinguish paused start-now estimates and unsaved running drafts from the actual running timer's end; keep existing draft protection and show a prompt for invalid/incomplete durations.
 - Set up this versioned Dev/Prod changelog and preserve the full request checklist separately.
 - Require changelog updates in main/PR checks and a matching dated entry before packaging a production release.
 - Generate release notes from this log for GitHub releases, keeping the published notes and repository history consistent; backfill the notes for 1.0.0 through 1.1.4.
 
 ### Verification
 
-- Pass eight changelog regression assertions, all 158 native assertions, and Dev/Release builds. Validate historical entries, release-note extraction, and rejection of missing/empty/duplicate entries and changes without a changelog update.
+- Pass eight changelog regression assertions, all 168 native assertions, Dev/Release builds, and editor UI captures. Cover rounding boundaries, next-day rollover, immediate draft preview, invalid drafts, and stable running countdown estimates.
 
 ## [1.1.4] - 2026-10-11
 

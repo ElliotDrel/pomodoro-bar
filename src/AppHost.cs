@@ -19,6 +19,8 @@ internal sealed class AppHost : IDisposable
     private long pulseUntil;
     private readonly string? settingsPath;
     private readonly Func<double> clock;
+    private readonly Func<DateTimeOffset> wallClock;
+    internal DateTimeOffset Now => wallClock();
     private readonly IAudio audio;
     private readonly DispatcherTimer tick, save;
     private readonly System.Windows.Forms.NotifyIcon? tray;
@@ -29,11 +31,12 @@ internal sealed class AppHost : IDisposable
     private bool restarting;
     public bool CanAutoRestart => !sessionTouched && !Timer.Running && !Timer.Waiting && !Editor.Editing;
 
-    public AppHost(Settings settings, string? settingsPath, IAudio audio, Func<double>? clock = null, bool services = true, bool smoke = false, UpdateTrigger startupTrigger = UpdateTrigger.Launch)
+    public AppHost(Settings settings, string? settingsPath, IAudio audio, Func<double>? clock = null, bool services = true, bool smoke = false, UpdateTrigger startupTrigger = UpdateTrigger.Launch, Func<DateTimeOffset>? wallClock = null)
     {
         Settings = settings; this.settingsPath = settingsPath; this.audio = audio;
         // TickCount64 advances across sleep; deadlines recover elapsed time on resume.
         this.clock = clock ?? (() => Environment.TickCount64 / 1000d);
+        this.wallClock = wallClock ?? (() => DateTimeOffset.Now);
         Timer = new TimerModel(settings.Focus,settings.Rest,settings.Thresholds,this.clock);
         save = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
         save.Tick += (_,_) => { save.Stop(); Save(); };

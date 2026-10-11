@@ -92,4 +92,12 @@ public sealed class TimerModel
         int whole = (int)Math.Ceiling(Math.Max(0, seconds));
         return whole >= 3600 ? $"{whole / 3600}:{whole / 60 % 60:00}:{whole % 60:00}" : $"{whole / 60:00}:{whole % 60:00}";
     }
+
+    public static DateTimeOffset EstimatedEnd(DateTimeOffset now, double seconds)
+    {
+        var end = now.AddSeconds(seconds);
+        long remainder = end.Ticks % TimeSpan.TicksPerMinute;
+        long rounded = end.Ticks - remainder + (remainder >= TimeSpan.TicksPerMinute / 2 ? TimeSpan.TicksPerMinute : 0);
+        return new DateTimeOffset(rounded, end.Offset);
+    }
 }

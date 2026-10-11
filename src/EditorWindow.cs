@@ -13,6 +13,7 @@ internal sealed class EditorWindow : Window
 {
     private readonly AppHost host;
     internal readonly TextBox TimeCard;
+    internal readonly TextBlock EndTime;
     internal readonly CheckBox ShowBar;
     internal readonly CheckBox ResizeBar;
     private readonly TextBlock heading, session, status, note, update, focusLength, breakLength, updateAction;
@@ -54,6 +55,8 @@ internal sealed class EditorWindow : Window
         TimeCard.LostKeyboardFocus += (_,_) => TimeCard.BorderBrush = Brushes.Transparent;
         card.Children.Add(TimeCard);
         card.Children.Add(UiTheme.Text("Click the time to edit. Enter saves; Esc cancels.",12,ink:UiTheme.Muted));
+        EndTime = UiTheme.Text("",13,ink:UiTheme.Muted);
+        EndTime.Margin = new Thickness(0,6,0,0); card.Children.Add(EndTime);
         cycle = new CycleStrip { Height = 28, Margin = new Thickness(0,14,0,4) }; card.Children.Add(cycle);
         var lengths = new DockPanel();
         breakLength = UiTheme.Text("",12,ink:UiTheme.Rest); DockPanel.SetDock(breakLength,Dock.Right); lengths.Children.Add(breakLength);
@@ -87,7 +90,7 @@ internal sealed class EditorWindow : Window
         update.VerticalAlignment = VerticalAlignment.Center; updateRow.Children.Add(update); panel.Children.Add(updateRow);
         note = UiTheme.Text("Set your time, then press play on the bar.",12,ink:UiTheme.Muted); note.Margin = new Thickness(0,14,0,8); panel.Children.Add(note);
         TimeCard.GotKeyboardFocus += (_,_) => { editing = true; dirty = false; };
-        TimeCard.TextChanged += (_,_) => { if (editing && !syncing) dirty = true; };
+        TimeCard.TextChanged += (_,_) => { if (editing && !syncing) dirty = true; SyncEndTime(); };
         TimeCard.LostKeyboardFocus += (_,_) => { if (!FinishEdit()) CancelEdit(); };
         TimeCard.PreviewKeyDown += (_,e) => {
             if (e.Key == Key.Enter) { if (FinishEdit()) Keyboard.ClearFocus(); e.Handled = true; }
@@ -131,6 +134,24 @@ internal sealed class EditorWindow : Window
         status.Foreground = t.Waiting ? UiTheme.Color("#FFAE66") : UiTheme.Muted;
         AlarmButton.Visibility = t.Waiting ? Visibility.Visible : Visibility.Collapsed;
         ShowBar.IsChecked = host.Bar.IsVisible; ResizeBar.IsChecked = host.Bar.ResizeEnabled;
+        SyncEndTime();
+    }
+    private void SyncEndTime()
+    {
+        var t = host.Timer;
+        double remaining = t.Remaining;
+        bool preview = editing && dirty;
+        if (preview) {
+            try { remaining = TimerModel.ParseTime(TimeCard.Text); }
+            catch (ArgumentException) { EndTime.Text = "Enter a valid time to preview the end."; return; }
+        } else if (t.Waiting) { EndTime.Text = t.IsFocus ? "Focus complete" : "Break complete"; return; }
+        var now = host.Now;
+        var end = TimerModel.EstimatedEnd(now,remaining).ToLocalTime();
+        var today = now.LocalDateTime.Date;
+        string day = end.Date == today ? "" : end.Date == today.AddDays(1) ? " tomorrow" : end.ToString(" 'on' ddd, MMM d");
+        string when = end.ToString("t") + day;
+        EndTime.Text = !t.Running ? "If started now · ends at " + when
+            : preview ? "If saved now · ends at " + when : "Ends at " + when;
     }
     internal void Note(string text) => note.Text = text;
     private void UpdateClicked()

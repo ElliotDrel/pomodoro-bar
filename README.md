@@ -4,6 +4,8 @@ A native Windows app with a small, always-on-top timer, a separate editor, and e
 
 See the [version/channel changelog](CHANGELOG.md) for changes between releases and [request checklist](REQUEST-CHECKLIST.md) for everything to verify, including the proposed separate Focus/Break controls.
 
+The editor shows the current focus or break section's estimated end time beneath the countdown. It updates immediately while typing, rounds the resulting clock time to the nearest minute, and labels next-day dates. Paused timers estimate an end if started now; an unsaved running draft estimates an end if saved now. Enter still saves the duration and Escape cancels it.
+
 Record every change under **Unreleased** before committing. Dev gets those changes when `main` is pulled and rebuilt. When releasing Prod, move the shipped notes into a dated version entry and keep the historical entries. Main/PR checks require a changelog update alongside other changed files; release CI requires the matching version entry and publishes its notes on GitHub. Validate locally with `scripts/changelog.ps1` and `tests/Changelog.Tests.ps1`.
 
 ## Install

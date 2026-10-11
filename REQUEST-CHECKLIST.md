@@ -4,6 +4,7 @@ See [CHANGELOG.md](CHANGELOG.md) for dated Dev/Prod changes between versions. Th
 
 ## Check the latest UI requests
 
+- [ ] Edit the countdown and watch the end time update immediately, rounded to the nearest minute. Paused timers show an estimate if started now; running unsaved drafts show an estimate if saved now; next-day times say tomorrow or show the date.
 - [ ] Check, download, install, and restart without a terminal appearing; progress stays in the editor.
 - [ ] Confirm one Pomodoro Bar Desktop shortcut, one Start Menu shortcut, and identical executable/icon targets; app search should no longer see the native executable and root launcher as separate entries.
 - [ ] Inspect the editor and bar for the new stopwatch-inspired design, readable text, and matching controls.

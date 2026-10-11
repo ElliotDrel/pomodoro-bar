@@ -46,6 +46,11 @@ internal static class Tests
             Check(t.Tick()=="last" && t.FiredCount==3,"resume coalesces overdue reminders");
             Check(t.Tick() is null,"no repeated reminder"); now=5000; Check(t.Tick()=="complete","resume completes without queued alarms");
             t.SetTime(7); Check(!t.Waiting && !t.Running && t.Remaining==7,"edit clears completion");
+            var wall = new DateTimeOffset(2026,10,11,14,0,0,TimeSpan.Zero);
+            Check(TimerModel.EstimatedEnd(wall,89)==wall.AddMinutes(1),"end preview rounds down below 30 seconds");
+            Check(TimerModel.EstimatedEnd(wall,90)==wall.AddMinutes(2),"end preview rounds half a minute forward");
+            Check(TimerModel.EstimatedEnd(wall.AddSeconds(20),70)==wall.AddMinutes(2),"round the resulting clock time rather than duration");
+            Check(TimerModel.EstimatedEnd(wall.AddHours(9).AddMinutes(59),40).Date==wall.Date.AddDays(1),"minute rounding carries into the next day");
             t.Toggle(); now+=2; t.Tick(); t.SetTime(20); now+=3; t.Tick(); Near(t.Remaining,17,"running edit resets deadline");
             now=0;t=new TimerModel(1,1,[40,20],()=>now);t.Toggle();now=1;
             Check(t.Toggle()=="complete" && t.Waiting,"pause at deadline delivers completion");
@@ -107,9 +112,14 @@ internal static class Tests
     {
         var app=new Application { ShutdownMode=ShutdownMode.OnExplicitShutdown };
         double now=0; var audio=new FakeAudio();
-        using var host=new AppHost(new Settings(),Path.Combine(scratch,"gui.json"),audio,()=>now,services:false);
+        var wallStart=DateTimeOffset.Now.Date.AddHours(14);
+        using var host=new AppHost(new Settings(),Path.Combine(scratch,"gui.json"),audio,()=>now,services:false,wallClock:()=>new DateTimeOffset(wallStart).AddSeconds(now));
         Pump();
         Check(host.Bar.IsVisible && host.Editor.IsVisible,"startup opens both windows by default");
+        Check(host.Editor.EndTime.Text=="If started now · ends at "+wallStart.AddMinutes(25).ToString("t"),"paused editor previews focus end if started now");
+        wallStart=wallStart.Date.AddHours(23).AddMinutes(50);host.Render();
+        Check(host.Editor.EndTime.Text=="If started now · ends at "+wallStart.Date.AddDays(1).AddMinutes(15).ToString("t")+" tomorrow","editor labels next-day end times");
+        wallStart=wallStart.Date.AddHours(14);host.Render();
         Check(host.CanAutoRestart,"default editor visibility does not count as user interaction");
         host.OpenEditor(); Pump();
         double width=host.Bar.Width,height=host.Bar.Height;
@@ -140,12 +150,18 @@ internal static class Tests
         host.Bar.SetResize(false);Check(host.Bar.WindowStyle==WindowStyle.None && host.Bar.ResizeMode==ResizeMode.NoResize,"resize disables frame");
         host.Bar.ResetSize();Near(host.Bar.Width,280,"reset width");Near(host.Bar.Height,52,"reset height");
         host.Editor.TimeCard.Focus();Keyboard.Focus(host.Editor.TimeCard);Pump();
-        host.Editor.TimeCard.Text="07:42"; now+=3;host.Tick();Check(host.Editor.TimeCard.Text=="07:42","live sync protects edited draft");
+        host.Editor.TimeCard.Text="07:42";
+        Check(host.Editor.EndTime.Text=="If saved now · ends at "+TimerModel.EstimatedEnd(host.Now,462).LocalDateTime.ToString("t"),"typing updates the preview immediately without saving or waiting for a tick");
+        now+=3;host.Tick();Check(host.Editor.TimeCard.Text=="07:42","live sync protects edited draft");
+        string draftEnd=TimerModel.EstimatedEnd(host.Now,462).LocalDateTime.ToString("t");
+        Check(host.Editor.EndTime.Text=="If saved now · ends at "+draftEnd,"draft end updates before saving without changing the countdown");
         Check(host.Editor.FinishEdit(),"commit edited time");Near(host.Timer.Remaining,462,"editor edits active section");
         host.Editor.CancelEdit();now+=1;host.Tick();Check(host.Editor.TimeCard.Text=="07:41","editor and countdown synchronize");
+        Check(host.Editor.EndTime.Text=="Ends at "+draftEnd,"running countdown keeps its estimated end stable");
         Keyboard.ClearFocus();Pump();host.Editor.TimeCard.Focus();Keyboard.Focus(host.Editor.TimeCard);Pump();
         host.Editor.TimeCard.RaiseEvent(new KeyboardFocusChangedEventArgs(Keyboard.PrimaryDevice,0,host.Editor,host.Editor.TimeCard) { RoutedEvent=Keyboard.GotKeyboardFocusEvent });
         host.Editor.TimeCard.Text="99:99";
+        Check(host.Editor.EndTime.Text=="Enter a valid time to preview the end.","invalid draft does not show a misleading end time");
         host.Editor.TimeCard.RaiseEvent(new KeyboardFocusChangedEventArgs(Keyboard.PrimaryDevice,0,host.Editor.TimeCard,host.Editor) { RoutedEvent=Keyboard.LostKeyboardFocusEvent });
         Check(!host.Editor.Editing && host.Editor.TimeCard.Text=="07:41",$"invalid blurred draft cancels instead of trapping editor: editing={host.Editor.Editing} text={host.Editor.TimeCard.Text}");
         host.Save(); Near(Settings.Load(Path.Combine(scratch,"gui.json")).Rest,462,"custom break saves");
