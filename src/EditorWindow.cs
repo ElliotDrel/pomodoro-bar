@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -84,10 +83,6 @@ internal sealed class EditorWindow : Window
         CheckUpdateButton = UiTheme.Button("Check for updates",host.CheckUpdates); CheckUpdateButton.IsEnabled = false;
         InstallUpdateButton = UiTheme.Button("Update and restart",host.InstallUpdate,true); InstallUpdateButton.IsEnabled = false;
         updateActions.Children.Add(CheckUpdateButton); updateActions.Children.Add(InstallUpdateButton); updatePanel.Children.Add(updateActions);
-        updatePanel.Children.Add(UiTheme.Button("Download installer",() => {
-            try { Process.Start(new ProcessStartInfo("https://github.com/ElliotDrel/pomodoro-bar/releases/latest/download/PomodoroBar-win-Setup.exe") { UseShellExecute = true }); }
-            catch (Exception ex) { Note("Could not open download: " + ex.Message); }
-        }));
         var updates = UiTheme.Disclosure("App updates",updatePanel);
         panel.Children.Add(updates);
         note = UiTheme.Text("Set your time, then press play on the bar.",12,ink:UiTheme.Muted); note.Margin = new Thickness(0,14,0,8); panel.Children.Add(note);

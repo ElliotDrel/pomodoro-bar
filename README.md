@@ -6,7 +6,7 @@ A native Windows app with a small, always-on-top timer, a separate editor, and e
 
 Download **PomodoroBar-win-Setup.exe** from the [latest release](https://github.com/ElliotDrel/pomodoro-bar/releases/latest). Installation is per user without administrator rights, and includes the .NET runtime. Launch Pomodoro Bar from the Start menu or desktop shortcut. Requires 64-bit Windows 10 or later.
 
-Production uses Velopack, matching Universal Spell Check's release flow. It checks on launch and every four hours. Startup downloads and applies an available update only before you interact with the timer or editor; once you start a session, it stages the update for later. Periodic and manual checks download in the background without restarting. The editor and tray offer **Check for updates** and installation of a verified downloaded update; the editor shows progress and last-checked/last-updated times. **Download installer** opens the latest public installer download. Restart starts a fresh paused focus period. The bar stays above ordinary windows; exclusive full-screen apps and secure screens can cover it.
+Production uses Velopack, matching Universal Spell Check's release flow. It checks on launch and every four hours. Startup downloads and applies an available update only before you interact with the timer or editor; once you start a session, it stages the update for later. Periodic and manual checks download in the background without restarting. The editor and tray offer **Check for updates** and installation of a verified downloaded update; the editor shows progress and last-checked/last-updated times. Installers are available on the public release page. Restart starts a fresh paused focus period. The bar stays above ordinary windows; exclusive full-screen apps and secure screens can cover it.
 
 ## Floating bar
 
@@ -33,7 +33,7 @@ The large time card mirrors the countdown. Click the digits and enter minutes (`
 
 The **Show floating bar** switch controls visibility independently of the editor; hidden timers keep running. Closing the editor preserves visibility. **Resize using the bar’s edges** enables native Windows sizing edges. Drag any edge/corner and turn it off to lock the borderless bar. All content and hit targets scale together. Default is 280 × 52, minimum 130 × 20, maximum 1000 × 120, in Windows device-independent pixels. **Reset size** restores the default without moving the bar or changing the timer. **Done** closes the editor; **Quit app** exits. Appearance and reminders are handled by code.
 
-Expand **App updates** for update status, check/download actions, and last-checked/last-updated times. The floating bar and its right-click menu use the same palette as the editor; the tray menu also follows it. The bar keeps its circle, countdown, play/pause, skip, and pencil controls. Reminder motion respects the Windows animation preference; completion still requires acknowledgement and its sound loops until silenced.
+Expand **App updates** for **Check for updates**, **Update and restart**, and last-checked/last-updated times. Checks download any available update automatically. The floating bar and its right-click menu use the same palette as the editor; the tray menu also follows it. The bar keeps its circle, countdown, play/pause, skip, and pencil controls. Reminder motion respects the Windows animation preference; completion still requires acknowledgement and its sound loops until silenced.
 
 ## Reminders
 
