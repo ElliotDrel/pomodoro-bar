@@ -8,6 +8,12 @@ See [the request checklist](REQUEST-CHECKLIST.md) for the complete feature revie
 
 ## [Unreleased]
 
+- No pending changes.
+
+## [1.1.6] - 2026-10-11
+
+Channel: Prod. [Release](https://github.com/ElliotDrel/pomodoro-bar/releases/tag/v1.1.6) · [Changes since 1.1.5](https://github.com/ElliotDrel/pomodoro-bar/compare/v1.1.5...v1.1.6).
+
 - Record the installed 1.1.5 CPU/RAM baseline and isolated refresh scenarios in `RESOURCE-AUDIT.md` before making optimizations; preserve the original measurements and their limitations.
 - Replace continuous 10 Hz UI polling with state-aware countdown, milestone, and rounded end-preview scheduling; skip hidden/minimized UI and animate only visible alerts. Catch up on Windows resume and clock changes.
 - Cache countdown layout/text, immutable drawing resources, session labels, and parsed drafts. Preserve immediate draft previews, completion acknowledgement, independent windows, and uniformly scaled controls.
