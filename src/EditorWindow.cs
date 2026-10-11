@@ -23,6 +23,7 @@ internal sealed class EditorWindow : Window
         this.host = host;
         Title = BuildChannel.DisplayName + " · Edit timer";
         Icon = AppIcon.Source;
+        ShowInTaskbar = false;
         Width = 480; Height = 625; MinWidth = 400; MinHeight = 390;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         Background = BarSurface.Brush("#222938"); Foreground = BarSurface.Brush("#eef1fa");

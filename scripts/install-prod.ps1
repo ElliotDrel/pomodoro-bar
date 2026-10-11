@@ -8,6 +8,16 @@ $ErrorActionPreference = 'Stop'
 try {
     & (Join-Path $PSScriptRoot 'verify-installation.ps1') -PreflightOnly
     $local = [Environment]::GetFolderPath('LocalApplicationData')
+    $existingExe = Join-Path $local 'PomodoroBar/current/PomodoroBar.exe'
+    if (Test-Path -LiteralPath $existingExe) {
+        $quit = Start-Process -FilePath $existingExe -ArgumentList '--quit' -WindowStyle Hidden -Wait -PassThru
+        if ($quit.ExitCode -ne 0) { throw 'Could not gracefully close the installed app before updating.' }
+        $stopDeadline = [DateTime]::UtcNow.AddSeconds(15)
+        while (Get-Process PomodoroBar -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $existingExe }) {
+            if ([DateTime]::UtcNow -gt $stopDeadline) { throw 'Installed app did not close before updating.' }
+            Start-Sleep -Milliseconds 250
+        }
+    }
     $data = Join-Path $local 'PomodoroBar.Data/settings.json'
     if ($NativeSettingsPath -and -not (Test-Path -LiteralPath $data)) {
         New-Item -ItemType Directory -Path (Split-Path $data) -Force | Out-Null
@@ -18,7 +28,8 @@ try {
     $verified = & (Join-Path $PSScriptRoot 'verify-installation.ps1') -ExpectedVersion $ExpectedVersion
     $launcher = Join-Path $local 'PomodoroBar/Pomodoro Bar.exe'
     $shell = New-Object -ComObject WScript.Shell
-    $desktopLink = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Pomodoro Timer.lnk'
+    $desktop = [Environment]::GetFolderPath('Desktop')
+    $desktopLink = Join-Path $desktop 'Pomodoro Bar.lnk'
     $links = @($desktopLink)
     $pinned = Join-Path ([Environment]::GetFolderPath('ApplicationData')) 'Microsoft/Internet Explorer/Quick Launch/User Pinned/TaskBar'
     Get-ChildItem -LiteralPath $pinned -Filter '*.lnk' -ErrorAction SilentlyContinue | ForEach-Object {
@@ -32,6 +43,13 @@ try {
         $link.Save()
         $check = $shell.CreateShortcut($path)
         if ($check.TargetPath -ne $launcher -or $check.IconLocation -ne ($verified.PhysicalExecutable+',0')) { throw "Shortcut mismatch: $path" }
+    }
+    # Retire only the known prototype shortcut when it points to this app.
+    # Velopack already creates Pomodoro Bar; creating a second name duplicates it.
+    $legacyLink = Join-Path $desktop 'Pomodoro Timer.lnk'
+    if (Test-Path -LiteralPath $legacyLink) {
+        $legacy = $shell.CreateShortcut($legacyLink)
+        if ($legacy.TargetPath -match '\\PomodoroBar\\') { Remove-Item -LiteralPath $legacyLink }
     }
     Start-Process -FilePath $launcher -WindowStyle Hidden
     $deadline = [DateTime]::UtcNow.AddSeconds(15)

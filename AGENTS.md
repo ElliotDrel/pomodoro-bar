@@ -6,6 +6,9 @@ Native C#/.NET 10 Windows app: WPF windows, WinForms tray, Velopack installer/up
 
 ## Preserve
 
+- One app and one desktop shortcut named Pomodoro Bar. Only one visible window supplies the taskbar entry; hiding the bar keeps the editor independently accessible.
+- Closing either window hides only that window. Quit alone exits the app; both windows can be reopened through tray/relaunch.
+
 - Uniformly scale circle, countdown, controls, and hit targets down to 130 × 20 DIPs.
 - Mirror the countdown in the editor without overwriting a draft.
 - Presets: 30 total = 25/5; 60 total = 50/10. Additions preserve 5:1 ratio and reminder percentages.

@@ -36,6 +36,8 @@ internal sealed class AppHost : IDisposable
         save = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
         save.Tick += (_,_) => { save.Stop(); Save(); };
         Bar = new BarWindow(this); Editor = new EditorWindow(this);
+        Bar.IsVisibleChanged += (_,_) => SyncTaskbar();
+        Editor.IsVisibleChanged += (_,_) => SyncTaskbar();
         tick = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
         tick.Tick += (_,_) => Tick();
         Bar.Show(); tick.Start();
@@ -104,6 +106,13 @@ internal sealed class AppHost : IDisposable
     {
         sessionTouched = true; Timer.SetTime(seconds); Silence(); pulseUntil = 0;
         Settings = Settings with { Focus = Timer.Focus, Rest = Timer.Rest }; Save(); Render();
+    }
+    private void SyncTaskbar()
+    {
+        // One taskbar entry for the app. Keep the windows independent so hiding
+        // or minimizing the bar never hides the editor through owner semantics.
+        Editor.ShowInTaskbar = Editor.IsVisible && !Bar.IsVisible;
+        Bar.ShowInTaskbar = Bar.IsVisible;
     }
     public void Render() { Bar.Surface.InvalidateVisual(); Editor.Sync(); }
     public void OpenEditor()

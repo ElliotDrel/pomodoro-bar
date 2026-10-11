@@ -29,7 +29,7 @@ internal sealed class BarWindow : Window
         SourceInitialized += (_, _) => RestoreReachablePosition();
         SizeChanged += (_, _) => { Surface.InvalidateVisual(); host.ScheduleSave(); };
         LocationChanged += (_, _) => host.ScheduleSave();
-        Closing += (_, e) => { if (!host.Closing) { e.Cancel = true; Dispatcher.BeginInvoke(host.Quit); } };
+        Closing += (_, e) => { if (!host.Closing) { e.Cancel = true; host.Silence(); Hide(); host.Render(); } };
         var menu = new ContextMenu();
         void Item(string text, Action action) { var item = new MenuItem { Header = text }; item.Click += (_, _) => { host.Silence(); action(); }; menu.Items.Add(item); }
         Item("Edit timer", host.OpenEditor); Item("Reset session", host.Reset);
