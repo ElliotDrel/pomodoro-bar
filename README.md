@@ -2,6 +2,8 @@
 
 A native Windows app with a small, always-on-top timer, a separate editor, and escalating reminders. Built with C#/.NET 10 and WPF. Version 1 replaces the Python/Tkinter prototype; Python is no longer needed.
 
+See the [changelog and request checklist](CHANGELOG.md) for released changes, what to verify, and the proposed separate Focus/Break controls.
+
 ## Install
 
 Download **PomodoroBar-win-Setup.exe** from the [latest release](https://github.com/ElliotDrel/pomodoro-bar/releases/latest). Installation is per user without administrator rights, and includes the .NET runtime. Launch Pomodoro Bar from the Start menu or desktop shortcut. Requires 64-bit Windows 10 or later.

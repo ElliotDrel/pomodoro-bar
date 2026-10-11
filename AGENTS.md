@@ -42,6 +42,7 @@ Native C#/.NET 10 Windows app: WPF windows, WinForms tray, Velopack installer/up
 | .agents/skills/deploy/SKILL.md | Dev/release workflow and closeout |
 | Launch Pomodoro.vbs | Compatibility launcher for installed native Prod |
 | README.md | Install, controls, migration, development, releases |
+| CHANGELOG.md | Release history and request-by-request verification checklist |
 
 ## Verification and publishing
 
