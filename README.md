@@ -16,6 +16,8 @@ A **Pomodoro Timer** shortcut is also installed on this computer's desktop. It l
 
 ## Editor
 
+The large time card at the top shows the same live countdown as the floating bar. Click its digits to edit, then press Enter or click away to save. Escape cancels your edit. You can enter minutes (15), MM:SS (12:34), or HH:MM:SS (1:02:03), from one second to 24 hours. Saving sets a new length for the current focus or break section and preserves whether the timer is running or paused. The other section keeps its length. While typing, the card preserves your draft while the floating bar continues counting down.
+
 Timing controls are **30 minutes**, **60 minutes**, **+1 minute**, **+5 minutes**, and **+10 minutes**. Choices apply immediately and create a new paused session. Press play on the bar to begin.
 
 The plus buttons increase the total focus-plus-break duration, preserving a 5:1 focus-to-break ratio and the selected preset's alert percentages. Adding one minute to the 30-minute preset gives 25:50 focus and 05:10 break.
@@ -23,6 +25,8 @@ The plus buttons increase the total focus-plus-break duration, preserving a 5:1 
 **Show floating bar** hides or shows the bar while the timer keeps running. Closing the editor keeps the selected visibility. If both windows are hidden, double-click the launcher again to reopen the editor, then check Show floating bar.
 
 **Done** closes the editor. **Quit** exits. Appearance, colors, and alerts are handled by code; there are no appearance selectors.
+
+**Reset bar size** restores the compact 280 × 52 pixel default without changing the timer or bar position. The countdown and play button are placed close together using the actual text width, including for longer custom durations.
 
 **Resize floating bar** enables standard Windows sizing edges around the bar. Drag an edge or corner, then turn resize off to restore the borderless bar. The circle, countdown, buttons, and click targets scale together to fit the window, preserving their proportions. Width and height are saved automatically. You can shrink the bar to 130 × 20 pixels; its maximum size is 1000 × 120 pixels. Extra space is centered when the window has a different aspect ratio.
 

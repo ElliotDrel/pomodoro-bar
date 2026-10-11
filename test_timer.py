@@ -95,6 +95,69 @@ class TimerTests(unittest.TestCase):
 
 
 class WindowTests(unittest.TestCase):
+    def test_live_time_edit_and_size_reset(self):
+        with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as directory:
+            root = tk.Tk()
+            app = m.App(root, Path(directory) / "settings.json")
+            root.update()
+            clock = Clock()
+            app.timer.clock = clock
+            app.toggle()
+            clock.now = 12
+            app.timer.tick()
+            app.render()
+            self.assertEqual(app.time_value.get(), app.bar.itemcget("countdown", "text"))
+            app.begin_time_edit()
+            app.time_value.set("12:34")
+            clock.now += 1
+            app.timer.tick()
+            app.render()
+            self.assertEqual(app.time_value.get(), "12:34")
+            self.assertTrue(app.finish_time_edit())
+            self.assertEqual(app.timer.remaining, 754)
+            self.assertTrue(app.timer.running)
+            self.assertEqual(app.time_value.get(), "12:34")
+            self.assertEqual(app.bar.itemcget("countdown", "text"), "12:34")
+            app.begin_time_edit()
+            app.time_value.set("99:99")
+            self.assertFalse(app.finish_time_edit())
+            self.assertEqual(app.timer.remaining, 754)
+            app.cancel_time_edit()
+            self.assertEqual(app.time_value.get(), "12:34")
+            app.skip()
+            app.begin_time_edit()
+            app.time_value.set("00:01")
+            self.assertTrue(app.finish_time_edit())
+            self.assertEqual(app.timer.rest, 1)
+            self.assertEqual(app.timer.focus, 754)
+            app.set_session(60, [60, 20, 10])
+            self.assertEqual(app.time_value.get(), "50:00")
+            app.add_minutes(1)
+            self.assertEqual(app.time_value.get(), app.bar.itemcget("countdown", "text"))
+            app.toggle()
+            app.config.update(width=130, height=20)
+            app.layout()
+            before = app.timer
+            position = (root.winfo_x(), root.winfo_y())
+            app.reset_bar_size()
+            root.update()
+            self.assertIs(app.timer, before)
+            self.assertTrue(app.timer.running)
+            self.assertEqual((root.winfo_width(), root.winfo_height()), (m.DEFAULTS["width"], m.DEFAULTS["height"]))
+            self.assertEqual((root.winfo_x(), root.winfo_y()), position)
+            countdown_right = app.bar.bbox("countdown")[2]
+            play_left = app.bar.bbox("play")[0]
+            self.assertGreaterEqual(play_left - countdown_right, 2)
+            self.assertLess(play_left - countdown_right, 25)
+            app.close()
+
+    def test_time_input_formats(self):
+        for value, seconds in (("15", 900), ("12:34", 754), ("1:02:03", 3723), ("00:01", 1), ("1440:00", 86400)):
+            self.assertEqual(m.App.parse_time(value), seconds)
+        for value in ("0", "25:60", "1:99:00", "-5", "nan", "", "1441:00"):
+            with self.assertRaises(ValueError):
+                m.App.parse_time(value)
+
     def test_uniform_scaling_and_tiny_bar(self):
         with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as directory:
             root = tk.Tk()
@@ -102,14 +165,17 @@ class WindowTests(unittest.TestCase):
             root.update()
             baseline = {tag: app.bar.coords(tag) for tag in ("ring_track", "countdown", "play", "skip", "edit")}
             baseline_hits = [box[:4] for box in app.hitboxes]
+            logical_width = app.logical_width
+            base_scale = min(app.config["width"] / logical_width, app.config["height"] / m.BASE_HEIGHT)
+            base_offsets = ((app.config["width"]-logical_width*base_scale)/2, (app.config["height"]-m.BASE_HEIGHT*base_scale)/2)
             for width, height in ((170, 26), (130, 20), (130, 52), (340, 104)):
                 app.config.update(width=width, height=height)
                 app.layout()
                 root.update()
-                scale = min(width / m.BASE_WIDTH, height / m.BASE_HEIGHT)
-                offsets = ((width - m.BASE_WIDTH*scale)/2, (height-m.BASE_HEIGHT*scale)/2)
+                scale = min(width / logical_width, height / m.BASE_HEIGHT)
+                offsets = ((width - logical_width*scale)/2, (height-m.BASE_HEIGHT*scale)/2)
                 for tag, coords in baseline.items():
-                    expected = [v*scale+offsets[i%2] for i, v in enumerate(coords)]
+                    expected = [(v-base_offsets[i%2])/base_scale*scale+offsets[i%2] for i, v in enumerate(coords)]
                     actual = app.bar.coords(tag)
                     for found, wanted in zip(actual, expected):
                         self.assertAlmostEqual(found, wanted, places=5)
@@ -120,7 +186,7 @@ class WindowTests(unittest.TestCase):
                     self.assertLessEqual(bottom, height)
                 for box, original in zip(app.hitboxes, baseline_hits):
                     for i in range(4):
-                        self.assertAlmostEqual(box[i], original[i]*scale+offsets[i%2])
+                        self.assertAlmostEqual(box[i], (original[i]-base_offsets[i%2])/base_scale*scale+offsets[i%2])
                 self.assertTrue(root.attributes("-topmost"))
             app.close()
 
@@ -132,7 +198,7 @@ class WindowTests(unittest.TestCase):
             root.update()
             self.assertTrue(root.attributes("-topmost"))
             self.assertTrue(root.overrideredirect())
-            self.assertEqual(root.winfo_width(), 340)
+            self.assertEqual(root.winfo_width(), m.DEFAULTS["width"])
             app.resize_enabled.set(True)
             app.toggle_resize()
             root.update()

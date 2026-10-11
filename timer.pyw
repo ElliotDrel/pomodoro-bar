@@ -7,16 +7,17 @@ import os
 from pathlib import Path
 import time
 import tkinter as tk
+from tkinter import font as tkfont
 from tkinter import ttk
 
-DEFAULTS = dict(focus=25.0, rest=5.0, thresholds=[40.0, 20.0], width=340,
+DEFAULTS = dict(focus=25.0, rest=5.0, thresholds=[40.0, 20.0], width=280,
                 height=52, font_size=22, background="#171c28", foreground="#f4f6fc",
                 focus_color="#9bafff", break_color="#66dbb7", alert_color="#ffbc70",
                 opacity=1.0, sound=False, x=80, y=80, gradient=True,
                 timer_white="#f4f6fc", timer_green="#66dbb7", timer_yellow="#ffe082",
                 timer_orange="#ffae66", timer_red="#ff5b6e")
 SETTINGS = Path(__file__).with_name("settings.json")
-BASE_WIDTH, BASE_HEIGHT = 340, 52
+BASE_WIDTH, BASE_HEIGHT = 280, 52
 MIN_WIDTH, MIN_HEIGHT = 130, 20
 
 
@@ -93,6 +94,18 @@ class Timer:
         self.running = run
         self.deadline = self.clock() + self.remaining if run else None
 
+    def set_remaining(self, seconds):
+        if not 1 <= seconds <= 86400:
+            raise ValueError("Enter a time from one second to 24 hours.")
+        if self.phase == "focus":
+            self.focus = seconds
+        else:
+            self.rest = seconds
+        self.remaining = seconds
+        self.waiting = False
+        self.fired.clear()
+        self.deadline = self.clock() + seconds if self.running else None
+
 
 class App:
     def __init__(self, root, settings_path=SETTINGS, reopen_event=None):
@@ -113,6 +126,9 @@ class App:
         self.resize_mode = False
         self.resize_save_id = None
         self.hitboxes = []
+        self.editing_time = False
+        self.time_dirty = False
+        self.logical_font = tkfont.Font(root=root, family="Consolas", size=self.config["font_size"], weight="bold")
         root.title("Pomodoro Bar")
         root.overrideredirect(True)
         root.attributes("-topmost", True)
@@ -177,8 +193,8 @@ class App:
     def validate(self, cfg):
         for name in ("focus", "rest"):
             value = float(cfg[name])
-            if not math.isfinite(value) or not .05 <= value <= 1440:
-                raise ValueError("Timer lengths must be between 0.05 and 1440 minutes.")
+            if not math.isfinite(value) or not 1/60 <= value <= 1440:
+                raise ValueError("Timer lengths must be between one second and 24 hours.")
         for name, low, high in (("width", MIN_WIDTH, 1000), ("height", MIN_HEIGHT, 120), ("font_size", 12, 48)):
             if not low <= int(cfg[name]) <= high:
                 raise ValueError(f"{name.replace('_', ' ').title()} must be {low}–{high}.")
@@ -199,6 +215,19 @@ class App:
         self.status = tk.StringVar()
         self.session_label = tk.StringVar()
         ttk.Label(self.panel, text="Study session", font=("Segoe UI", 16, "bold")).pack(anchor="w")
+        self.time_value = tk.StringVar(value=self.format_time(self.timer.remaining))
+        self.time_card = tk.Frame(self.panel, bg="#171c28", highlightbackground="#343e54", highlightcolor="#9bafff", highlightthickness=1, padx=14, pady=10)
+        self.time_card.pack(fill="x", pady=(12, 4))
+        self.time_heading = tk.StringVar(value="FOCUS · TIME REMAINING")
+        tk.Label(self.time_card, textvariable=self.time_heading, bg="#171c28", fg="#9bafff", font=("Segoe UI", 9, "bold")).pack()
+        self.time_entry = tk.Entry(self.time_card, textvariable=self.time_value, justify="center", font=("Consolas", 34, "bold"), bg="#171c28", fg="#f4f6fc", insertbackground="#9bafff", selectbackground="#394a7b", relief="flat", borderwidth=0, highlightthickness=0, width=9)
+        self.time_entry.pack(fill="x", pady=(3, 0))
+        tk.Label(self.time_card, text="Click to edit · Enter to save · Esc to cancel", bg="#171c28", fg="#94a0b8", font=("Segoe UI", 9)).pack()
+        self.time_entry.bind("<FocusIn>", self.begin_time_edit)
+        self.time_entry.bind("<FocusOut>", self.finish_time_edit)
+        self.time_entry.bind("<Return>", self.commit_time_edit)
+        self.time_entry.bind("<Escape>", self.cancel_time_edit)
+        self.time_value.trace_add("write", self.mark_time_edit)
         ttk.Label(self.panel, textvariable=self.session_label, font=("Segoe UI", 12)).pack(anchor="w", pady=(8, 2))
         ttk.Label(self.panel, textvariable=self.status).pack(anchor="w", pady=(0, 16))
         presets = ttk.Frame(self.panel)
@@ -213,6 +242,7 @@ class App:
         ttk.Checkbutton(self.panel, text="Show floating bar", variable=self.bar_visible, command=self.toggle_visibility).pack(anchor="w", pady=(0, 12))
         self.resize_enabled = tk.BooleanVar(value=False)
         ttk.Checkbutton(self.panel, text="Resize floating bar · drag its edges", variable=self.resize_enabled, command=self.toggle_resize).pack(anchor="w", pady=(0, 12))
+        ttk.Button(self.panel, text="Reset bar size", command=self.reset_bar_size).pack(anchor="w", pady=(0, 12))
         self.note = tk.StringVar(value="Choose a duration, then press play on the bar.")
         ttk.Label(self.panel, textvariable=self.note, wraplength=410).pack(anchor="w", pady=(0, 16))
         actions = ttk.Frame(self.panel)
@@ -223,9 +253,79 @@ class App:
 
     def describe_session(self):
         total = self.config["focus"] + self.config["rest"]
-        self.session_label.set(f"{total:g} minutes · {self.format_time(self.config['focus']*60)} focus + {self.format_time(self.config['rest']*60)} break")
+        self.session_label.set(f"{total:.2f}".rstrip("0").rstrip(".") + f" minutes · {self.format_time(self.config['focus']*60)} focus + {self.format_time(self.config['rest']*60)} break")
+
+    @staticmethod
+    def parse_time(value):
+        parts = value.strip().split(":")
+        if not 1 <= len(parts) <= 3 or any(not p.isascii() or not p.isdigit() for p in parts):
+            raise ValueError("Use minutes, MM:SS, or HH:MM:SS.")
+        numbers = list(map(int, parts))
+        if len(parts) > 1 and any(n >= 60 for n in numbers[1:]):
+            raise ValueError("Seconds and the minutes in HH:MM:SS must be below 60.")
+        seconds = numbers[0]*60 if len(parts) == 1 else sum(n * 60**(len(numbers)-i-1) for i,n in enumerate(numbers))
+        if not 1 <= seconds <= 86400:
+            raise ValueError("Enter a time from one second to 24 hours.")
+        return seconds
+
+    def begin_time_edit(self, event=None):
+        self.editing_time = True
+        self.time_dirty = False
+        self.time_card.configure(highlightbackground="#9bafff")
+
+    def mark_time_edit(self, *_):
+        if self.editing_time:
+            self.time_dirty = True
+
+    def finish_time_edit(self, event=None):
+        if self.editing_time and self.time_dirty:
+            try:
+                seconds = self.parse_time(self.time_value.get())
+            except ValueError as exc:
+                self.note.set(str(exc))
+                if event is None:
+                    return False
+            else:
+                self.timer.set_remaining(seconds)
+                self.config["focus" if self.timer.phase == "focus" else "rest"] = seconds / 60
+                self.pulse_until = 0
+                self.describe_session()
+                if self.save():
+                    self.note.set("Time saved. " + ("Countdown continues." if self.timer.running else "Press play to begin."))
+        self.editing_time = False
+        self.time_dirty = False
+        self.time_card.configure(highlightbackground="#343e54")
+        self.render()
+        return True
+
+    def commit_time_edit(self, event=None):
+        if self.finish_time_edit():
+            self.editor.focus_set()
+        return "break"
+
+    def cancel_time_edit(self, event=None):
+        self.editing_time = False
+        self.time_dirty = False
+        self.time_card.configure(highlightbackground="#343e54")
+        self.editor.focus_set()
+        self.render()
+        return "break"
+
+    def reset_bar_size(self):
+        if self.resize_save_id:
+            self.root.after_cancel(self.resize_save_id)
+            self.resize_save_id = None
+        self.config.update(width=DEFAULTS["width"], height=DEFAULTS["height"])
+        self.layout()
+        self.root.update_idletasks()
+        if self.save():
+            self.note.set("Default bar size restored.")
 
     def set_session(self, total, thresholds=None):
+        self.editing_time = False
+        self.time_dirty = False
+        self.time_card.configure(highlightbackground="#343e54")
+        self.editor.focus_set()
         if total > 1440:
             self.note.set("Maximum session length is 24 hours.")
             return
@@ -371,8 +471,13 @@ class App:
         c.delete("all")
         c.create_rectangle(0, 0, w-1, h-1, outline=blend(bg, fg, .22))
         # Draw one logical layout, then uniformly transform all shapes and hit areas.
-        scale = min(w / BASE_WIDTH, h / BASE_HEIGHT)
-        ox, oy = (w - BASE_WIDTH * scale) / 2, (h - BASE_HEIGHT * scale) / 2
+        countdown_text = self.format_time(timer.remaining)
+        countdown_x = 64
+        play_x = countdown_x + self.logical_font.measure(countdown_text) + 22
+        logical_width = play_x + 99
+        self.logical_width = logical_width
+        scale = min(w / logical_width, h / BASE_HEIGHT)
+        ox, oy = (w - logical_width * scale) / 2, (h - BASE_HEIGHT * scale) / 2
         cy, radius = BASE_HEIGHT / 2, 16
         cx = radius + 15
         color = cfg["focus_color"] if timer.phase == "focus" else cfg["break_color"]
@@ -391,9 +496,9 @@ class App:
             c.create_oval(cx-3, cy-3, cx+3, cy+3, outline="", fill=color)
         font_size = max(1, round(cfg["font_size"] * scale))
         digits = countdown_color(timer.remaining / timer.duration, [self.root.winfo_rgb(cfg[key]) for key in ("timer_white", "timer_green", "timer_yellow", "timer_orange", "timer_red")]) if cfg["gradient"] else fg
-        c.create_text(cx+radius+17, cy, text=self.format_time(timer.remaining), anchor="w", fill=digits, font=("Consolas", font_size, "bold"), tags="countdown")
+        c.create_text(countdown_x, cy, text=countdown_text, anchor="w", fill=digits, font=("Consolas", font_size, "bold"), tags="countdown")
         self.hitboxes = [(cx-radius-5, 0, cx+radius+5, BASE_HEIGHT, self.acknowledge)]
-        centers = [BASE_WIDTH-99, BASE_WIDTH-61, BASE_WIDTH-23]
+        centers = [play_x, play_x+38, play_x+76]
         for x, action in zip(centers, (self.toggle, self.skip, self.open_editor)):
             self.hitboxes.append((x-17, 0, x+17, BASE_HEIGHT, action))
         x = centers[0]
@@ -421,6 +526,10 @@ class App:
                          for a, b, d, e, action in self.hitboxes]
         state = "Click the ring or play to begin the next section" if timer.waiting else ("Running" if timer.running else "Paused")
         self.status.set(f"{timer.phase.title()} · {self.format_time(timer.remaining)} · {state}")
+        self.time_heading.set(f"{timer.phase.upper()} · TIME REMAINING")
+        if not self.editing_time:
+            self.time_value.set(self.format_time(timer.remaining))
+        self.time_entry.configure(fg=digits)
 
     def press(self, event):
         for x1, y1, x2, y2, action in self.hitboxes:
