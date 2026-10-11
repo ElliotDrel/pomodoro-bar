@@ -17,7 +17,8 @@ internal static class Program
     [STAThread]
     public static int Main(string[] args)
     {
-        VelopackApp.Build().SetAutoApplyOnStartup(false).Run();
+        VelopackApp.Build().SetLocator(Velopack.Locators.VelopackLocator.CreateDefaultForPlatform(new BackgroundUpdateProcess(), null))
+            .SetAutoApplyOnStartup(false).Run();
         if (args.Contains("--version")) { Log.Write("version_requested"); return 0; }
         bool smoke = args.Contains("--startup-smoke",StringComparer.OrdinalIgnoreCase);
         bool restart = args.Contains("--restart",StringComparer.OrdinalIgnoreCase) || args.Contains("--update",StringComparer.OrdinalIgnoreCase);

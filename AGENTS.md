@@ -32,12 +32,14 @@ Native C#/.NET 10 Windows app: WPF windows, WinForms tray, Velopack installer/up
 | src/BuildChannel.cs, src/Log.cs | Channel identity, paths and diagnostics |
 | src/InstanceServer.cs | Current-user relaunch/restart IPC |
 | src/UpdateService.cs | Unified update/download/restart flow |
+| src/BackgroundUpdateProcess.cs | Explicit no-shell/no-console policy for restart and apply helpers |
 | src/Audio.cs, sounds/ | Async Windows playback and bundled WAV chimes |
 | tests/ | Native engine, GUI, layout, migration and audio regression harness |
-| tests/UpdateFlowTests.cs | Fake-package updater regression tests; never run real helpers |
+| tests/UpdateFlowTests.cs | Fake-package updater regressions and a harmless real console-window suppression probe |
 | assets/ | Prod app icon and yellow-background Dev variant |
 | scripts/dev.ps1 | Dev run helper |
 | scripts/install-prod.ps1, scripts/verify-installation.ps1 | Unpackaged installation and physical-path/shortcut verification |
+| scripts/background.ps1.vbs | Hidden PowerShell launcher for unpackaged installation/verification tasks |
 | .github/workflows/ | Main checks and tagged production releases |
 | .agents/skills/deploy/SKILL.md | Dev/release workflow and closeout |
 | Launch Pomodoro.vbs | Compatibility launcher for installed native Prod |

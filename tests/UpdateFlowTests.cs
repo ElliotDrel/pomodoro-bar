@@ -16,6 +16,18 @@ internal static class UpdateFlowTests
     public static void Run(string root)
     {
         var directory=Path.Combine(root,"updates");Directory.CreateDirectory(directory);
+        var hidden = BackgroundUpdateProcess.StartInfo("helper.exe", ["apply", "path with spaces", "--silent"], directory);
+        Check(!hidden.UseShellExecute && hidden.CreateNoWindow && hidden.WindowStyle==System.Diagnostics.ProcessWindowStyle.Hidden,"helper explicitly suppresses shell and console windows");
+        Check(hidden.ArgumentList.SequenceEqual(new[]{"apply","path with spaces","--silent"}) && hidden.WorkingDirectory==directory,"background helper preserves separate arguments and working directory");
+        // A real console executable must receive no console, including no inherited console.
+        var probe=Path.Combine(directory,"console.txt");
+        var probeScript=Path.Combine(directory,"console.ps1");
+        File.WriteAllText(probeScript,"Add-Type -MemberDefinition '[System.Runtime.InteropServices.DllImport(\"kernel32.dll\")] public static extern System.IntPtr GetConsoleWindow();' -Name ConsoleProbe -Namespace Probe; [IO.File]::WriteAllText('"+probe.Replace("'","''")+"',[Probe.ConsoleProbe]::GetConsoleWindow().ToInt64().ToString())");
+        var powershell=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),"WindowsPowerShell","v1.0","powershell.exe");
+        using(var child=System.Diagnostics.Process.Start(BackgroundUpdateProcess.StartInfo(powershell,["-NoProfile","-NonInteractive","-File",probeScript],directory))!) {
+            if(!child.WaitForExit(15000)){child.Kill();throw new Exception("console probe timed out");}
+            Check(child.ExitCode==0 && File.ReadAllText(probe)=="0","real background helper has no console window");
+        }
         var locator=new RecordingLocator(directory);
         File.WriteAllText(locator.UpdateExePath!,"fixture; never executed");
         VelopackApp.Build().SetLocator(locator).SetAutoApplyOnStartup(false).Run();
@@ -27,6 +39,7 @@ internal static class UpdateFlowTests
         Check(!service.PrepareRestart(true) && service.State.Phase==UpdatePhase.Current,"install with no package preserves status");
         Check(service.LastCheckedAt is not null && service.LastUpdatedAt is not null,"update timestamps recorded");
         Check(service.PrepareRestart(false),"pure restart succeeds");
+        Check(!locator.Recorder.ShowWindow,"restart requests a hidden helper");
         Check(locator.Recorder.Arguments.Contains("start") && !locator.Recorder.Arguments.Contains("--restart"),"restart waits for exit without replaying command");
         manager.Target=new UpdateInfo(VelopackAssetFeed.FromJson("""
             {"Assets":[{"PackageId":"Test","Version":"2.0.0","Type":"Full","FileName":"Test-2.0.0-full.nupkg","Size":1}]}
@@ -49,6 +62,7 @@ internal static class UpdateFlowTests
         Check(!service.PrepareRestart(true) && service.HasPending,"failed install helper keeps verified download retryable");
         locator.Recorder.Fail=false;
         Check(service.PrepareRestart(true),"verified download can install");
+        Check(!locator.Recorder.ShowWindow,"apply requests a hidden helper");
         Check(locator.Recorder.Arguments.Contains("apply") && locator.Recorder.Arguments.Contains("--waitPid") && locator.Recorder.Arguments.Contains("--silent"),"apply is silent and waits for graceful exit");
         manager.Delay=Task.FromException<UpdateInfo?>(new IOException("check failed"));
         service.CheckAsync(UpdateTrigger.Launch).GetAwaiter().GetResult();
@@ -88,9 +102,9 @@ internal static class UpdateFlowTests
     }
     private sealed class RecordingProcess : IProcessImpl
     {
-        public string[] Arguments=[];public bool Fail;public int Exits;
+        public string[] Arguments=[];public bool Fail;public int Exits;public bool ShowWindow;
         public string GetCurrentProcessPath()=>Environment.ProcessPath!;public uint GetCurrentProcessId()=>(uint)Environment.ProcessId;
         public void Exit(int code)=>Exits++;
-        public void StartProcess(string exe,IEnumerable<string> args,string workDir,bool showWindow){if(Fail) throw new IOException("missing helper");Arguments=args.ToArray();}
+        public void StartProcess(string exe,IEnumerable<string> args,string workDir,bool showWindow){if(Fail) throw new IOException("missing helper");Arguments=args.ToArray();ShowWindow=showWindow;}
     }
 }

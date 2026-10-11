@@ -1,14 +1,14 @@
 # Changelog and request checklist
 
-## Latest release: 1.1.2
+## Latest release: 1.1.3
 
-- Open the [public release](https://github.com/ElliotDrel/pomodoro-bar/releases/tag/v1.1.2) for the installer, portable build, and update files.
-- View the [successful release workflow](https://github.com/ElliotDrel/pomodoro-bar/actions/runs/38157509157) and [main checks](https://github.com/ElliotDrel/pomodoro-bar/actions/runs/38157508779).
+- Open the [public release](https://github.com/ElliotDrel/pomodoro-bar/releases/tag/v1.1.3) for the installer, portable build, and update files.
 - Run the finished native app with the redesigned editor, floating bar, switches, and menus.
-- Check the implementation with 153 regression assertions, Dev/Release builds, rendered UI captures, and a self-contained startup smoke test.
+- Check the implementation with 158 regression assertions, Dev/Release builds, rendered UI captures, and a self-contained startup smoke test.
 
 ## Recent changes
 
+- **1.1.3:** Enforce hidden, no-console process launches for update installation and restart; launch local release verification through a hidden script host instead of visibly opening PowerShell. Add a real console-process probe and assertions for both updater paths.
 - **1.1.2:** Replace the update dropdown and separate buttons with one update action beside its status information; remove **Quit app** and **Done** from the editor.
 - **1.1.1:** Remove the installer download button from the installed app; keep installer downloads on the public release page.
 - **1.1.0:** Rebuild the native UI with a graphite palette, prominent editable countdown, focus/break timeline, descriptive presets, switches, matching menus, and visible keyboard focus.
@@ -23,6 +23,7 @@
 
 ## Check the latest UI requests
 
+- [ ] Check, download, install, and restart without a terminal appearing; progress stays in the editor.
 - [ ] Inspect the editor and bar for the new stopwatch-inspired design, readable text, and matching controls.
 - [ ] Resize the editor smaller and scroll with the wheel; confirm no scrollbar appears.
 - [ ] Find **Check for updates** directly beside version, update status, last checked, and last updated; confirm there is no update dropdown.
