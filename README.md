@@ -2,7 +2,9 @@
 
 A native Windows app with a small, always-on-top timer, a separate editor, and escalating reminders. Built with C#/.NET 10 and WPF. Version 1 replaces the Python/Tkinter prototype; Python is no longer needed.
 
-See the [changelog and request checklist](CHANGELOG.md) for released changes, what to verify, and the proposed separate Focus/Break controls.
+See the [version/channel changelog](CHANGELOG.md) for changes between releases and [request checklist](REQUEST-CHECKLIST.md) for everything to verify, including the proposed separate Focus/Break controls.
+
+Record every change under **Unreleased** before committing. Dev gets those changes when `main` is pulled and rebuilt. When releasing Prod, move the shipped notes into a dated version entry and keep the historical entries. Main/PR checks require a changelog update alongside other changed files; release CI requires the matching version entry and publishes its notes on GitHub. Validate locally with `scripts/changelog.ps1` and `tests/Changelog.Tests.ps1`.
 
 ## Install
 

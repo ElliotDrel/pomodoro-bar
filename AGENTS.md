@@ -17,6 +17,7 @@ Native C#/.NET 10 Windows app: WPF windows, WinForms tray, Velopack installer/up
 - Channel identity, paths, locks, IPC belong in `BuildChannel.cs`. Dev never auto-updates.
 - Settings live in channel-specific LocalAppData outside the installer-owned root; preserve them on updates.
 - One update flow: `UpdateService.CheckAsync`; launch applies, periodic stages.
+- Every change must update `CHANGELOG.md` before committing: record Dev/tooling work under Unreleased; move released changes into a dated version entry when tagging Prod. Preserve old version history and update `REQUEST-CHECKLIST.md` when a requested behavior changes. CI enforces the log and generates release notes from it.
 
 ## Files
 
@@ -45,7 +46,10 @@ Native C#/.NET 10 Windows app: WPF windows, WinForms tray, Velopack installer/up
 | .agents/skills/deploy/SKILL.md | Dev/release workflow and closeout |
 | Launch Pomodoro.vbs | Compatibility launcher for installed native Prod |
 | README.md | Install, controls, migration, development, releases |
-| CHANGELOG.md | Release history and request-by-request verification checklist |
+| CHANGELOG.md | Dated version/channel history, Unreleased changes, and source for public release notes |
+| REQUEST-CHECKLIST.md | Complete user-request verification checklist and unimplemented proposals |
+| scripts/changelog.ps1 | Validate log updates and dated release entries; extract version-specific notes |
+| tests/Changelog.Tests.ps1 | Release-note extraction and missing-log/invalid-history regression fixtures |
 
 ## Verification and publishing
 

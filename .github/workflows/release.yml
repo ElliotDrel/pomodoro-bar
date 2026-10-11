@@ -22,6 +22,9 @@ jobs:
           "semver=$($tag.Substring(1))" >> $env:GITHUB_OUTPUT
       - name: Native regression tests
         run: dotnet run --project tests/PomodoroBar.Tests.csproj -c Release
+      - name: Validate and generate release notes
+        shell: pwsh
+        run: ./scripts/changelog.ps1 -Version '${{ steps.ver.outputs.semver }}' -OutputPath release-notes.md
       - name: Publish
         shell: pwsh
         run: |
@@ -66,3 +69,6 @@ jobs:
           vpk upload github --repoUrl '${{ github.server_url }}/${{ github.repository }}' `
             --token $env:GITHUB_TOKEN --tag '${{ github.ref_name }}' `
             --releaseName 'Pomodoro Bar ${{ github.ref_name }}' --publish
+          if ($LASTEXITCODE -ne 0) { throw 'Release upload failed.' }
+          gh release edit '${{ github.ref_name }}' --repo '${{ github.repository }}' --notes-file release-notes.md
+          if ($LASTEXITCODE -ne 0) { throw 'Could not publish changelog release notes.' }
