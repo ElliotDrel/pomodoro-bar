@@ -41,6 +41,15 @@ Milestones refer to **time remaining in focus**, not the whole session.
 
 Milestones throb for four seconds. At the end of either section, the bar pulses at 00:00 until acknowledged. Waiting does not consume time from the next section. Click the circle, play, or skip to acknowledge and start the next section.
 
+Each reminder also plays a distinct escalating sound, assigned backward from the final reminder:
+
+- **Third-last (when present):** one short, softer beep.
+- **Second-last:** a distinct rising two-note sound.
+- **Last:** a stronger rising three-note sound.
+- **Section completion:** a repeating beep pattern until you click anywhere on the bar.
+
+The 30-minute preset uses the second-last and last sounds; the 60-minute preset adds the single beep first. Sound playback is asynchronous, so the controls remain responsive. Clicking the digits or pencil silences audio while leaving completion flashing; clicking the circle, play, or skip also acknowledges completion and starts the next section. Changing the timer or quitting also cancels audio. After sleep or a long interruption, only the most urgent crossed alert plays.
+
 Countdown colors interpolate continuously: white at 100%, green at 80%, yellow at 40%, orange at 20%, and red at 5% remaining. This applies separately to focus and break.
 
 Duration and position are saved in settings.json beside the app. Reopening starts a fresh paused focus period with the bar visible. The bar stays above ordinary desktop windows; exclusive full-screen apps and Windows secure screens can cover it.

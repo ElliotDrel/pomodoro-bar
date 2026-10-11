@@ -1,11 +1,14 @@
 """Floating Pomodoro bar. Standard-library-only, Python 3.10+ / Tk."""
 import ctypes
+from array import array
 import hashlib
 import json
 import math
 import os
+import sys
 from pathlib import Path
 import time
+import wave
 import tkinter as tk
 from tkinter import font as tkfont
 from tkinter import ttk
@@ -13,12 +16,80 @@ from tkinter import ttk
 DEFAULTS = dict(focus=25.0, rest=5.0, thresholds=[40.0, 20.0], width=280,
                 height=52, font_size=22, background="#171c28", foreground="#f4f6fc",
                 focus_color="#9bafff", break_color="#66dbb7", alert_color="#ffbc70",
-                opacity=1.0, sound=False, x=80, y=80, gradient=True,
+                opacity=1.0, x=80, y=80, gradient=True,
                 timer_white="#f4f6fc", timer_green="#66dbb7", timer_yellow="#ffe082",
                 timer_orange="#ffae66", timer_red="#ff5b6e")
 SETTINGS = Path(__file__).with_name("settings.json")
 BASE_WIDTH, BASE_HEIGHT = 280, 52
 MIN_WIDTH, MIN_HEIGHT = 130, 20
+SOUND_PATTERNS = {
+    "earlier": (.20, [(740, .13, .18)]),
+    "second-last": (.28, [(660, .13, .05), (880, .20, .12)]),
+    "last": (.36, [(880, .15, .05), (1175, .15, .05), (1568, .25, .12)]),
+    "complete": (.40, [(1200, .18, .08), (1200, .18, .08), (1600, .25, .85)]),
+}
+
+
+def reminder_sound(total, fired):
+    remaining = total - fired
+    return "last" if remaining <= 0 else "second-last" if remaining == 1 else "earlier"
+
+
+def build_sound_assets(directory):
+    """Short synthesized chimes with soft edges to avoid clicks."""
+    directory = Path(directory)
+    directory.mkdir(parents=True, exist_ok=True)
+    rate = 22050
+    for name, (volume, pattern) in SOUND_PATTERNS.items():
+        path = directory / f"{name}.wav"
+        if path.exists():
+            continue
+        samples = array("h")
+        for frequency, duration, gap in pattern:
+            length = round(duration * rate)
+            fade = round(.008 * rate)
+            for i in range(length):
+                envelope = min(1, i/fade, (length-1-i)/fade)
+                tone = math.sin(2 * math.pi * frequency * i / rate)
+                samples.append(round(32767 * volume * envelope * tone))
+            samples.extend([0] * round(gap * rate))
+        if sys.byteorder != "little":
+            samples.byteswap()
+        with wave.open(str(path), "wb") as audio:
+            audio.setnchannels(1)
+            audio.setsampwidth(2)
+            audio.setframerate(rate)
+            audio.writeframes(samples.tobytes())
+
+
+class SoundPlayer:
+    """Windows async playback keeps the UI responsive; stop cancels looped audio."""
+    def __init__(self, directory=None, backend=None):
+        self.error = None
+        self.directory = Path(directory) if directory else Path(__file__).with_name("sounds")
+        self.backend = backend
+        if self.backend is None and os.name == "nt":
+            import winsound
+            self.backend = winsound
+        build_sound_assets(self.directory)
+
+    def play(self, name, repeat=False):
+        self.error = None
+        if self.backend:
+            flags = self.backend.SND_FILENAME | self.backend.SND_ASYNC | self.backend.SND_NODEFAULT
+            if repeat:
+                flags |= self.backend.SND_LOOP
+            try:
+                self.backend.PlaySound(str(self.directory / f"{name}.wav"), flags)
+            except RuntimeError as exc:
+                self.error = f"Could not play the timer sound: {exc}"
+
+    def stop(self):
+        if self.backend:
+            try:
+                self.backend.PlaySound(None, 0)
+            except RuntimeError:
+                pass
 
 
 def countdown_color(fraction, colors):
@@ -108,9 +179,10 @@ class Timer:
 
 
 class App:
-    def __init__(self, root, settings_path=SETTINGS, reopen_event=None):
+    def __init__(self, root, settings_path=SETTINGS, reopen_event=None, audio=None):
         self.root, self.settings_path = root, settings_path
         self.reopen_event = reopen_event
+        self.audio = audio if audio is not None else SoundPlayer()
         self.config = DEFAULTS.copy()
         try:
             saved = json.loads(settings_path.read_text(encoding="utf-8"))
@@ -287,6 +359,7 @@ class App:
                     return False
             else:
                 self.timer.set_remaining(seconds)
+                self.audio.stop()
                 self.config["focus" if self.timer.phase == "focus" else "rest"] = seconds / 60
                 self.pulse_until = 0
                 self.describe_session()
@@ -427,21 +500,25 @@ class App:
             self.panel_canvas.yview_scroll(-int(event.delta/120), "units")
 
     def reset(self):
+        self.audio.stop()
         self.timer = Timer(self.config["focus"], self.config["rest"], self.config["thresholds"])
         self.pulse_until = 0
         self.render()
 
     def toggle(self):
+        self.audio.stop()
         self.timer.toggle()
         self.pulse_until = 0
         self.render()
 
     def skip(self):
+        self.audio.stop()
         self.timer.advance()
         self.pulse_until = 0
         self.render()
 
     def acknowledge(self):
+        self.audio.stop()
         if self.timer.waiting:
             self.timer.advance(True)
         self.pulse_until = 0
@@ -532,6 +609,8 @@ class App:
         self.time_entry.configure(fg=digits)
 
     def press(self, event):
+        # Any interaction with the bar silences sound, including edit or dragging.
+        self.audio.stop()
         for x1, y1, x2, y2, action in self.hitboxes:
             if x1 <= event.x <= x2 and y1 <= event.y <= y2:
                 action()
@@ -560,12 +639,17 @@ class App:
         events = self.timer.tick()
         if events:
             self.pulse_until = time.perf_counter() + 4
-            if self.config["sound"]:
-                self.root.bell()
+            if "complete" in events:
+                self.audio.play("complete", repeat=True)
+            else:
+                self.audio.play(reminder_sound(len(self.timer.thresholds), len(self.timer.fired)))
+            if getattr(self.audio, "error", None):
+                self.note.set(self.audio.error)
         self.render()
         self.after_id = self.root.after(80, self.update)
 
     def close(self):
+        self.audio.stop()
         self.save()
         self.root.after_cancel(self.after_id)
         if self.resize_save_id:

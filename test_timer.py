@@ -4,6 +4,8 @@ from pathlib import Path
 import tempfile
 import tkinter as tk
 import unittest
+from types import SimpleNamespace
+import wave
 
 APP = Path(__file__).with_name("timer.pyw")
 if not APP.exists():
@@ -18,6 +20,41 @@ class Clock:
     now = 0.0
     def __call__(self):
         return self.now
+
+
+class FakeAudio:
+    def __init__(self):
+        self.calls = []
+    def play(self, name, repeat=False):
+        self.calls.append((name, repeat))
+    def stop(self):
+        self.calls.append(("stop", False))
+
+
+class AudioTests(unittest.TestCase):
+    def test_reminders_count_backwards(self):
+        self.assertEqual([m.reminder_sound(3, i) for i in (1, 2, 3)], ["earlier", "second-last", "last"])
+        self.assertEqual([m.reminder_sound(2, i) for i in (1, 2)], ["second-last", "last"])
+        self.assertEqual(m.reminder_sound(1, 1), "last")
+
+    def test_async_loop_and_stop_and_sound_files(self):
+        calls = []
+        backend = SimpleNamespace(SND_FILENAME=1, SND_ASYNC=2, SND_NODEFAULT=4, SND_LOOP=8, PlaySound=lambda name, flags: calls.append((name, flags)))
+        with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as directory:
+            player = m.SoundPlayer(directory, backend)
+            frame_counts = []
+            for name in m.SOUND_PATTERNS:
+                with wave.open(str(Path(directory)/f"{name}.wav"), "rb") as wav:
+                    self.assertEqual(wav.getnchannels(), 1)
+                    self.assertEqual(wav.getsampwidth(), 2)
+                    frame_counts.append(wav.getnframes())
+            self.assertEqual(frame_counts, sorted(frame_counts))
+            player.play("last")
+            self.assertEqual(calls[-1][1], 7)
+            player.play("complete", repeat=True)
+            self.assertEqual(calls[-1][1], 15)
+            player.stop()
+            self.assertEqual(calls[-1], (None, 0))
 
 
 class TimerTests(unittest.TestCase):
@@ -95,10 +132,57 @@ class TimerTests(unittest.TestCase):
 
 
 class WindowTests(unittest.TestCase):
+    def test_alert_playback_and_any_bar_click_cancels_loop(self):
+        with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as directory:
+            root = tk.Tk()
+            audio = FakeAudio()
+            app = m.App(root, Path(directory)/"settings.json", audio=audio)
+            root.update()
+            clock = Clock()
+            app.timer.clock = clock
+            app.toggle()
+            def tick(now):
+                clock.now = now
+                root.after_cancel(app.after_id)
+                app.update()
+            tick(900)
+            self.assertEqual(audio.calls[-1], ("second-last", False))
+            tick(1200)
+            self.assertEqual(audio.calls[-1], ("last", False))
+            tick(1500)
+            self.assertEqual(audio.calls[-1], ("complete", True))
+            self.assertTrue(app.timer.waiting)
+            count = len(audio.calls)
+            tick(1501)
+            self.assertEqual(len(audio.calls), count)
+            app.press(SimpleNamespace(x=90, y=26, x_root=90, y_root=26))
+            self.assertEqual(audio.calls[-1], ("stop", False))
+            self.assertTrue(app.timer.waiting)
+            tick(1502)
+            self.assertEqual(audio.calls[-1], ("stop", False))
+            app.acknowledge()
+            self.assertEqual(app.timer.phase, "break")
+            self.assertTrue(app.timer.running)
+            app.set_session(60, [60, 20, 10])
+            clock.now = 0
+            app.timer.clock = clock
+            app.toggle()
+            tick(1200)
+            self.assertEqual(audio.calls[-1], ("earlier", False))
+            tick(2400)
+            self.assertEqual(audio.calls[-1], ("second-last", False))
+            tick(2700)
+            self.assertEqual(audio.calls[-1], ("last", False))
+            # Crossing several reminders during sleep plays only completion.
+            tick(5000)
+            self.assertEqual(audio.calls[-1], ("complete", True))
+            app.close()
+            self.assertEqual(audio.calls[-1], ("stop", False))
+
     def test_live_time_edit_and_size_reset(self):
         with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as directory:
             root = tk.Tk()
-            app = m.App(root, Path(directory) / "settings.json")
+            app = m.App(root, Path(directory) / "settings.json", audio=FakeAudio())
             root.update()
             clock = Clock()
             app.timer.clock = clock
@@ -161,7 +245,7 @@ class WindowTests(unittest.TestCase):
     def test_uniform_scaling_and_tiny_bar(self):
         with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as directory:
             root = tk.Tk()
-            app = m.App(root, Path(directory) / "settings.json")
+            app = m.App(root, Path(directory) / "settings.json", audio=FakeAudio())
             root.update()
             baseline = {tag: app.bar.coords(tag) for tag in ("ring_track", "countdown", "play", "skip", "edit")}
             baseline_hits = [box[:4] for box in app.hitboxes]
@@ -194,7 +278,7 @@ class WindowTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as directory:
             root = tk.Tk()
             settings = Path(directory) / "settings.json"
-            app = m.App(root, settings)
+            app = m.App(root, settings, audio=FakeAudio())
             root.update()
             self.assertTrue(root.attributes("-topmost"))
             self.assertTrue(root.overrideredirect())
@@ -258,7 +342,7 @@ class WindowTests(unittest.TestCase):
             self.assertTrue(app.timer.running)
             app.close()
             root = tk.Tk()
-            restored = m.App(root, settings)
+            restored = m.App(root, settings, audio=FakeAudio())
             root.update()
             self.assertEqual(restored.config["width"], 420)
             self.assertEqual(restored.config["height"], 72)
