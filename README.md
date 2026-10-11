@@ -2,6 +2,8 @@
 
 Double-click **Launch Pomodoro.vbs** to open the small, always-on-top Windows timer. Requires Python with Tkinter, already installed on this computer. Launching it again opens the existing timer's editor.
 
+A **Pomodoro Timer** shortcut is also installed on this computer's desktop. It launches the same app without a terminal window. After a code update, quit the running timer and reopen it to load the new version.
+
 ## Floating bar
 
 - **Progress circle:** progress through the entire focus-plus-break cycle. Purple means focus; green means break. Click it to dismiss a milestone flash. At section completion, clicking it acknowledges and starts the next section.
@@ -22,7 +24,7 @@ The plus buttons increase the total focus-plus-break duration, preserving a 5:1 
 
 **Done** closes the editor. **Quit** exits. Appearance, colors, and alerts are handled by code; there are no appearance selectors.
 
-**Resize floating bar** enables standard Windows sizing edges around the bar. Drag an edge or corner, then turn resize off to restore the borderless bar. The timer keeps its state while resizing. Width and height are saved automatically; resizing supports widths of 260–1000 pixels and heights of 36–120 pixels, and the countdown type adapts to the height.
+**Resize floating bar** enables standard Windows sizing edges around the bar. Drag an edge or corner, then turn resize off to restore the borderless bar. The circle, countdown, buttons, and click targets scale together to fit the window, preserving their proportions. Width and height are saved automatically. You can shrink the bar to 130 × 20 pixels; its maximum size is 1000 × 120 pixels. Extra space is centered when the window has a different aspect ratio.
 
 ## Alerts and colors
 

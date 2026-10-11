@@ -95,6 +95,35 @@ class TimerTests(unittest.TestCase):
 
 
 class WindowTests(unittest.TestCase):
+    def test_uniform_scaling_and_tiny_bar(self):
+        with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as directory:
+            root = tk.Tk()
+            app = m.App(root, Path(directory) / "settings.json")
+            root.update()
+            baseline = {tag: app.bar.coords(tag) for tag in ("ring_track", "countdown", "play", "skip", "edit")}
+            baseline_hits = [box[:4] for box in app.hitboxes]
+            for width, height in ((170, 26), (130, 20), (130, 52), (340, 104)):
+                app.config.update(width=width, height=height)
+                app.layout()
+                root.update()
+                scale = min(width / m.BASE_WIDTH, height / m.BASE_HEIGHT)
+                offsets = ((width - m.BASE_WIDTH*scale)/2, (height-m.BASE_HEIGHT*scale)/2)
+                for tag, coords in baseline.items():
+                    expected = [v*scale+offsets[i%2] for i, v in enumerate(coords)]
+                    actual = app.bar.coords(tag)
+                    for found, wanted in zip(actual, expected):
+                        self.assertAlmostEqual(found, wanted, places=5)
+                    left, top, right, bottom = app.bar.bbox(tag)
+                    self.assertGreaterEqual(left, 0)
+                    self.assertGreaterEqual(top, 0)
+                    self.assertLessEqual(right, width)
+                    self.assertLessEqual(bottom, height)
+                for box, original in zip(app.hitboxes, baseline_hits):
+                    for i in range(4):
+                        self.assertAlmostEqual(box[i], original[i]*scale+offsets[i%2])
+                self.assertTrue(root.attributes("-topmost"))
+            app.close()
+
     def test_window_settings_and_acknowledgement(self):
         with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as directory:
             root = tk.Tk()

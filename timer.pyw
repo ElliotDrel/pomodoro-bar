@@ -16,6 +16,8 @@ DEFAULTS = dict(focus=25.0, rest=5.0, thresholds=[40.0, 20.0], width=340,
                 timer_white="#f4f6fc", timer_green="#66dbb7", timer_yellow="#ffe082",
                 timer_orange="#ffae66", timer_red="#ff5b6e")
 SETTINGS = Path(__file__).with_name("settings.json")
+BASE_WIDTH, BASE_HEIGHT = 340, 52
+MIN_WIDTH, MIN_HEIGHT = 130, 20
 
 
 def countdown_color(fraction, colors):
@@ -177,7 +179,7 @@ class App:
             value = float(cfg[name])
             if not math.isfinite(value) or not .05 <= value <= 1440:
                 raise ValueError("Timer lengths must be between 0.05 and 1440 minutes.")
-        for name, low, high in (("width", 260, 1000), ("height", 36, 120), ("font_size", 12, 48)):
+        for name, low, high in (("width", MIN_WIDTH, 1000), ("height", MIN_HEIGHT, 120), ("font_size", 12, 48)):
             if not low <= int(cfg[name]) <= high:
                 raise ValueError(f"{name.replace('_', ' ').title()} must be {low}–{high}.")
         if not .3 <= float(cfg["opacity"]) <= 1:
@@ -293,7 +295,7 @@ class App:
         self.resize_mode = self.resize_enabled.get()
         self.root.overrideredirect(not self.resize_mode)
         self.root.resizable(self.resize_mode, self.resize_mode)
-        self.root.minsize(260, 36)
+        self.root.minsize(MIN_WIDTH, MIN_HEIGHT)
         self.root.maxsize(1000, 120)
         if self.resize_mode:
             self.bar_visible.set(True)
@@ -309,8 +311,8 @@ class App:
 
     def on_resize(self, event):
         if event.widget is self.root and self.resize_mode:
-            self.config["width"] = max(260, min(1000, event.width))
-            self.config["height"] = max(36, min(120, event.height))
+            self.config["width"] = max(MIN_WIDTH, min(1000, event.width))
+            self.config["height"] = max(MIN_HEIGHT, min(120, event.height))
             self.render()
             if self.resize_save_id:
                 self.root.after_cancel(self.resize_save_id)
@@ -368,12 +370,15 @@ class App:
         c.configure(bg=bg)
         c.delete("all")
         c.create_rectangle(0, 0, w-1, h-1, outline=blend(bg, fg, .22))
-        cy, radius = h/2, min(16, h/2-7)
+        # Draw one logical layout, then uniformly transform all shapes and hit areas.
+        scale = min(w / BASE_WIDTH, h / BASE_HEIGHT)
+        ox, oy = (w - BASE_WIDTH * scale) / 2, (h - BASE_HEIGHT * scale) / 2
+        cy, radius = BASE_HEIGHT / 2, 16
         cx = radius + 15
         color = cfg["focus_color"] if timer.phase == "focus" else cfg["break_color"]
         if timer.waiting:
             color = cfg["alert_color"]
-        c.create_oval(cx-radius, cy-radius, cx+radius, cy+radius, outline=blend(bg, fg, .2), width=3)
+        c.create_oval(cx-radius, cy-radius, cx+radius, cy+radius, outline=blend(bg, fg, .2), width=3, tags="ring_track")
         progress = timer.progress
         if progress > 0:
             if progress >= .9999:
@@ -381,31 +386,39 @@ class App:
             else:
                 c.create_arc(cx-radius, cy-radius, cx+radius, cy+radius, start=90, extent=-360*progress, style="arc", outline=color, width=3)
         if timer.waiting:
-            c.create_text(cx, cy, text="!", fill=fg, font=("Segoe UI", max(10, int(radius)), "bold"))
+            c.create_text(cx, cy, text="!", fill=fg, font=("Segoe UI", max(1, round(radius*scale)), "bold"))
         else:
             c.create_oval(cx-3, cy-3, cx+3, cy+3, outline="", fill=color)
-        # Reserve control space and shrink oversized type to keep small bars usable.
-        font_size = min(48, round(cfg["font_size"]*h/52), int(h*.49), int((w-165)/3.2))
+        font_size = max(1, round(cfg["font_size"] * scale))
         digits = countdown_color(timer.remaining / timer.duration, [self.root.winfo_rgb(cfg[key]) for key in ("timer_white", "timer_green", "timer_yellow", "timer_orange", "timer_red")]) if cfg["gradient"] else fg
-        c.create_text(cx+radius+17, cy, text=self.format_time(timer.remaining), anchor="w", fill=digits, font=("Consolas", font_size, "bold"))
-        self.hitboxes = [(cx-radius-5, 0, cx+radius+5, h, self.acknowledge)]
-        centers = [w-99, w-61, w-23]
+        c.create_text(cx+radius+17, cy, text=self.format_time(timer.remaining), anchor="w", fill=digits, font=("Consolas", font_size, "bold"), tags="countdown")
+        self.hitboxes = [(cx-radius-5, 0, cx+radius+5, BASE_HEIGHT, self.acknowledge)]
+        centers = [BASE_WIDTH-99, BASE_WIDTH-61, BASE_WIDTH-23]
         for x, action in zip(centers, (self.toggle, self.skip, self.open_editor)):
-            self.hitboxes.append((x-17, 0, x+17, h, action))
+            self.hitboxes.append((x-17, 0, x+17, BASE_HEIGHT, action))
         x = centers[0]
         if timer.running:
             for offset in (-5, 3):
-                c.create_rectangle(x+offset, cy-7, x+offset+3, cy+7, fill=fg, outline="")
+                c.create_rectangle(x+offset, cy-7, x+offset+3, cy+7, fill=fg, outline="", tags="play")
         else:
-            c.create_polygon(x-5, cy-8, x-5, cy+8, x+7, cy, fill=fg)
+            c.create_polygon(x-5, cy-8, x-5, cy+8, x+7, cy, fill=fg, tags="play")
         x = centers[1]
-        c.create_polygon(x-7, cy-7, x-7, cy+7, x+3, cy, fill=fg)
+        c.create_polygon(x-7, cy-7, x-7, cy+7, x+3, cy, fill=fg, tags="skip")
         c.create_line(x+6, cy-7, x+6, cy+7, fill=fg, width=2)
         x = centers[2]
         # Pencil, drawn without depending on an installed icon font.
-        c.create_polygon(x-7, cy+4, x+3, cy-6, x+7, cy-2, x-3, cy+8, fill="", outline=fg, width=2)
+        c.create_polygon(x-7, cy+4, x+3, cy-6, x+7, cy-2, x-3, cy+8, fill="", outline=fg, width=2, tags="edit")
         c.create_line(x+1, cy-4, x+5, cy, fill=fg, width=2)
         c.create_polygon(x-7, cy+4, x-8, cy+9, x-3, cy+8, fill=fg)
+        # The outer frame stays at the real window bounds. Text fonts need their
+        # own scaled size because Canvas.scale only transforms text positions.
+        for item in c.find_all()[1:]:
+            c.scale(item, 0, 0, scale, scale)
+            c.move(item, ox, oy)
+            if c.type(item) in ("line", "oval", "arc", "polygon", "rectangle"):
+                c.itemconfigure(item, width=max(.5, float(c.itemcget(item, "width"))*scale))
+        self.hitboxes = [(ox+a*scale, oy+b*scale, ox+d*scale, oy+e*scale, action)
+                         for a, b, d, e, action in self.hitboxes]
         state = "Click the ring or play to begin the next section" if timer.waiting else ("Running" if timer.running else "Paused")
         self.status.set(f"{timer.phase.title()} · {self.format_time(timer.remaining)} · {state}")
 
