@@ -1,6 +1,15 @@
 # Pomodoro Bar
 
-A native Windows app with a small, always-on-top timer, a separate editor, and escalating reminders. Built with C#/.NET 10 and WPF. Version 1 replaces the Python/Tkinter prototype; Python is no longer needed.
+[Download for Windows](https://github.com/ElliotDrel/pomodoro-bar/releases/latest/download/PomodoroBar-win-Setup.exe) · [Release notes](https://github.com/ElliotDrel/pomodoro-bar/releases) · [Report a bug](https://github.com/ElliotDrel/pomodoro-bar/issues/new) · [Resource audit](RESOURCE-AUDIT.md)
+
+A free Windows Pomodoro timer that stays visible while you work. Its small, always-on-top bar shows progress, the countdown, play/pause, skip, and an edit button. The separate editor lets you change the timer and resize the bar; escalating sounds remind you as time runs out.
+
+- Windows 10 or later, 64-bit; the installer includes .NET and needs no administrator rights.
+- Start with 25 minutes of focus plus a 5-minute break, or 50 plus 10. Edit the current section directly.
+- Scale the complete bar down to 130 × 20 DIPs. Hide either window independently while the timer continues.
+- Check, download, and install updates in the background from the editor or command line.
+
+Built with C#/.NET 10 and WPF. Version 1 replaces the Python/Tkinter prototype; Python is no longer needed.
 
 See the [version/channel changelog](CHANGELOG.md) for changes between releases and [request checklist](REQUEST-CHECKLIST.md) for everything to verify, including the proposed separate Focus/Break controls.
 

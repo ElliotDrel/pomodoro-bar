@@ -8,7 +8,7 @@ See [the request checklist](REQUEST-CHECKLIST.md) for the complete feature revie
 
 ## [Unreleased]
 
-- No pending changes.
+- Improve GitHub discovery with a clear product description, Windows/productivity topics, and a working download website link. Add direct install, release, support, and measurement links plus a concise user overview to the README. Documentation only; the app binary is unchanged.
 
 ## [1.1.6] - 2026-10-11
 
