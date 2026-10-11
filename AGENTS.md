@@ -32,6 +32,7 @@ Native C#/.NET 10 Windows app: WPF windows, WinForms tray, Velopack installer/up
 | tests/ | Native engine, GUI, layout, migration and audio regression harness |
 | assets/ | App icon |
 | scripts/dev.ps1 | Dev run helper |
+| scripts/install-prod.ps1, scripts/verify-installation.ps1 | Unpackaged installation and physical-path/shortcut verification |
 | .github/workflows/ | Main checks and tagged production releases |
 | .agents/skills/deploy/SKILL.md | Dev/release workflow and closeout |
 | Launch Pomodoro.vbs | Compatibility launcher for installed native Prod |
@@ -42,3 +43,5 @@ Native C#/.NET 10 Windows app: WPF windows, WinForms tray, Velopack installer/up
 Run `dotnet run --project tests/PomodoroBar.Tests.csproj -c Release`, Dev and Release builds, and `git diff --check` before committing. Tests require Windows and silent fake audio. Rebuild/relaunch native changes. Update README and the file map for changed controls/files.
 
 Read `.agents/skills/deploy/SKILL.md` when publishing. Use the user-requested branch and meaningful commits. Semver tags trigger CI/Velopack upload; verify public release and installed local Prod before closeout. Stop only session-owned Dev instances/scratch. Never delete backups without explicit per-file permission.
+
+Local deployment must run outside packaged/MSIX processes. AppData writes can be redirected even with elevated execution or absolute paths; verify the physical file path and shell shortcuts from an unpackaged process before claiming success.

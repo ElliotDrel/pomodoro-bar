@@ -69,4 +69,6 @@ Finish verification and commit on `main`, then push `main` and the approved semv
 
 Verify successful CI, a public non-draft release and installer/update assets, then install and verify local Prod. Leave Prod running, stop verification Dev instances, and verify every session commit is pushed. See [deployment instructions](.agents/skills/deploy/SKILL.md).
 
+Local installation must run from an ordinary Windows session outside a packaged app such as Codex. Packaged-process AppData virtualization can redirect an otherwise valid installer into the host's private cache. Run `scripts/verify-installation.ps1 -PreflightOnly` before installation, use `scripts/install-prod.ps1 -InstallerPath <published-setup.exe> -ExpectedVersion <version>`, and verify the physical installation and shortcut paths. The GitHub build and native window-icon checks alone do not establish desktop installation correctness.
+
 Installed `PomodoroBar.exe --restart` requests a graceful Velopack restart; `--update` is an alias. Exit zero acknowledges delivery; verify the fresh `started` log and installed version to confirm completion. `--quit` gracefully closes that channel's existing instance, and succeeds without starting one if none is running. `--startup-smoke` constructs native UI including the tray with silent audio and exits without reading/writing user settings or enabling IPC/updates.

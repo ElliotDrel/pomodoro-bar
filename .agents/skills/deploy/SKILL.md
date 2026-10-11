@@ -19,11 +19,12 @@ Push verified committed changes to `origin/main`. Pull and run `dotnet run --pro
 4. Push `main` and `vX.Y.Z` together. CI runs tests → self-contained publish → startup smoke → `vpk pack` → `vpk upload github --publish`. Never bypass CI with manual production packaging/upload.
 5. Verify remote tag and matching completed successful workflow. Diagnose failures; do not claim queued/running CI is done.
 6. Verify public `isDraft=false` release, version, installer, package, and update feed. Only a fully uploaded stuck draft may be published manually.
-7. First install: run the published setup and import legacy settings if needed. Subsequent updates: installed `PomodoroBar.exe --restart`, then verify binary version and fresh `started` log. Accepted IPC alone does not prove installation. Leave verified Prod running.
+7. Before local installation or update verification, run `scripts/verify-installation.ps1 -PreflightOnly` from the execution process. A packaged/MSIX process must fail closed: even elevated commands and literal AppData paths can be redirected. Perform installation from an unpackaged Windows session; use `scripts/install-prod.ps1` with the published installer and expected version. Preserve/import existing settings. After installation, run `scripts/verify-installation.ps1 -ExpectedVersion X.Y.Z` to verify the physical path, not only `Test-Path`, environment variables, file version or logical process path. Verify desktop/pinned shortcut target and icon paths in that same unpackaged context. This supersedes the previous version-only installation check.
+8. Subsequent updates: invoke installed `PomodoroBar.exe --restart`, verify physical installation, binary version and fresh `started` log. Accepted IPC alone does not prove installation. Leave verified Prod running.
 
 ## Closeout
 
-- Every session change committed/pushed; local HEAD matches remote main and release tag.
+- Every session change committed/pushed; local HEAD matches remote main. A production release tag matches the released app commit; later documentation or tooling commits may advance main without republishing unchanged binaries.
 - Session-owned Dev/testing processes stopped and listeners cleared.
 - Disposable scratch cleaned; preserve backups, user settings, retained evidence/tooling, and unrelated state.
 - Report release/CI links, installed version/PID, and anything incomplete. Do not finish publishing with an unverified release.
