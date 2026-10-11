@@ -25,6 +25,8 @@ Pomodoro Bar is one app with two independent windows, each available in the task
 
 Closing either window hides only that window and keeps the timer running. Reopen the bar from the tray's **Show floating bar** menu; reopen the editor by launching Pomodoro Bar again or double-clicking its tray icon. **Quit** exits the entire app.
 
+The editor uses light text on its dark background. Scrollbars stay hidden; scroll with the mouse wheel or navigate controls with Tab when the window is small.
+
 The large time card mirrors the countdown. Click the digits and enter minutes (`15`), `MM:SS` (`12:34`), or `HH:MM:SS` (`1:02:03`). Enter or clicking away saves; Escape cancels. Values range from one second to 24 hours. Saving sets the current section's length and remaining time, preserving running/paused state. The other section keeps its length. The bar keeps counting while the card protects your draft.
 
 **30 minutes**, **60 minutes**, **+1 minute**, **+5 minutes**, and **+10 minutes** create a fresh paused session. Plus buttons preserve a 5:1 focus/break ratio and current reminder percentages. Adding one minute to the 30-minute preset gives 25:50 focus and 05:10 break. Presets/additions allow a maximum 24-hour total.

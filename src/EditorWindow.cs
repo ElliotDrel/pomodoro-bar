@@ -32,7 +32,7 @@ internal sealed class EditorWindow : Window
         Background = BarSurface.Brush("#222938"); Foreground = BarSurface.Brush("#eef1fa");
         FontFamily = new FontFamily("Segoe UI"); FontSize = 14;
         var panel = new StackPanel { Margin = new Thickness(24) };
-        Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
         panel.Children.Add(Label("Study session",24,true));
         var card = new StackPanel { Margin = new Thickness(0,10,0,10) };
         heading = Label("FOCUS · TIME REMAINING",12,true); heading.HorizontalAlignment = HorizontalAlignment.Center;
@@ -55,10 +55,10 @@ internal sealed class EditorWindow : Window
         presets.Children.Add(Button("60 minutes", () => host.SetSession(60,[60,20,10]))); panel.Children.Add(presets);
         var adds = new UniformGrid { Columns = 3, Margin = new Thickness(0,6,0,14) };
         foreach (int n in new[] {1,5,10}) adds.Children.Add(Button($"+{n} minute{(n == 1 ? "" : "s")}", () => host.AddMinutes(n))); panel.Children.Add(adds);
-        ShowBar = new CheckBox { Content = "Show floating bar", IsChecked = true, Margin = new Thickness(3,8,0,8) };
+        ShowBar = new CheckBox { Content = "Show floating bar", Foreground = Foreground, IsChecked = true, Margin = new Thickness(3,8,0,8) };
         ShowBar.Click += (_,_) => { if (ShowBar.IsChecked == true) host.Bar.Show(); else host.Bar.Hide(); };
         panel.Children.Add(ShowBar);
-        ResizeBar = new CheckBox { Content = "Resize floating bar · drag its edges", Margin = new Thickness(3,8,0,8) };
+        ResizeBar = new CheckBox { Content = "Resize floating bar · drag its edges", Foreground = Foreground, Margin = new Thickness(3,8,0,8) };
         ResizeBar.Click += (_,_) => { if (ResizeBar.IsChecked == true) host.Bar.Show(); host.Bar.SetResize(ResizeBar.IsChecked == true); host.Render(); }; panel.Children.Add(ResizeBar);
         panel.Children.Add(Button("Reset bar size", host.Bar.ResetSize));
         note = Label("Choose a duration, then press play on the bar.",12); note.Margin = new Thickness(0,12,0,8); panel.Children.Add(note);
