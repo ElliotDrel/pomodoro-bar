@@ -19,16 +19,17 @@ internal static class Program
     {
         VelopackApp.Build().SetAutoApplyOnStartup(false).Run();
         if (args.Contains("--version")) { Log.Write("version_requested"); return 0; }
-        bool smoke = args.Contains("--startup-smoke");
-        bool restart = args.Contains("--restart") || args.Contains("--update");
-        bool quit = args.Contains("--quit");
+        bool smoke = args.Contains("--startup-smoke",StringComparer.OrdinalIgnoreCase);
+        bool restart = args.Contains("--restart",StringComparer.OrdinalIgnoreCase) || args.Contains("--update",StringComparer.OrdinalIgnoreCase);
+        bool check = args.Contains("--check-for-updates",StringComparer.OrdinalIgnoreCase);
+        if ((restart || check) && BuildChannel.IsDev) return 1;
+        bool quit = args.Contains("--quit",StringComparer.OrdinalIgnoreCase);
         using var mutex = new Mutex(false, smoke ? BuildChannel.MutexName + ".smoke." + Environment.ProcessId : BuildChannel.MutexName);
         bool owner;
         try { owner = mutex.WaitOne(0); } catch (AbandonedMutexException) { owner = true; }
-        if (!owner) return InstanceServer.Send(quit ? "quit" : restart ? "restart" : "show").GetAwaiter().GetResult() ? 0 : 1;
+        if (!owner) return InstanceServer.Send(quit ? "quit" : restart ? "restart" : check ? "check" : "show").GetAwaiter().GetResult() ? 0 : 1;
         try {
             if (quit) return 0;
-            if (restart && BuildChannel.IsDev) return 1;
             string path = Path.Combine(BuildChannel.DataDirectory,"settings.json");
             StartupSettings startup = new(new Settings(),true,null);
             if (!smoke) {
@@ -38,7 +39,7 @@ internal static class Program
             }
             var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
             app.DispatcherUnhandledException += (_,e) => { Log.Write("fatal " + e.Exception); };
-            using var host = new AppHost(startup.Value,smoke || !startup.CanSave ? null : path,smoke ? new SilentAudio() : new Audio(),smoke:smoke);
+            using var host = new AppHost(startup.Value,smoke || !startup.CanSave ? null : path,smoke ? new SilentAudio() : new Audio(),smoke:smoke,startupTrigger:check ? UpdateTrigger.Manual : UpdateTrigger.Launch);
             if (startup.Warning is not null) { host.OpenEditor(); host.Editor.Note(startup.Warning); }
             if (smoke) {
                 foreach (string name in new[] {"earlier","second-last","last","complete"})

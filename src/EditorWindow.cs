@@ -1,9 +1,11 @@
 using System;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Data;
 using PomodoroBar.Core;
 
 namespace PomodoroBar;
@@ -16,6 +18,7 @@ internal sealed class EditorWindow : Window
     internal readonly CheckBox ResizeBar;
     private readonly TextBlock heading, session, status, note, update;
     internal readonly Button AlarmButton;
+    internal readonly Button CheckUpdateButton, InstallUpdateButton;
     private bool editing, dirty, syncing;
     internal bool Editing => editing;
     public EditorWindow(AppHost host)
@@ -24,7 +27,7 @@ internal sealed class EditorWindow : Window
         Title = BuildChannel.DisplayName + " · Edit timer";
         Icon = AppIcon.Source;
         ShowInTaskbar = true;
-        Width = 480; Height = 625; MinWidth = 400; MinHeight = 390;
+        Width = 480; Height = Math.Min(735,SystemParameters.WorkArea.Height-40); MinWidth = 400; MinHeight = 390;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         Background = BarSurface.Brush("#222938"); Foreground = BarSurface.Brush("#eef1fa");
         FontFamily = new FontFamily("Segoe UI"); FontSize = 14;
@@ -60,6 +63,14 @@ internal sealed class EditorWindow : Window
         panel.Children.Add(Button("Reset bar size", host.Bar.ResetSize));
         note = Label("Choose a duration, then press play on the bar.",12); note.Margin = new Thickness(0,12,0,8); panel.Children.Add(note);
         update = Label($"Version {BuildChannel.Version} · {BuildChannel.Name}",12); panel.Children.Add(update);
+        var updateActions = new UniformGrid { Columns = 2, Margin = new Thickness(0,8,0,0) };
+        CheckUpdateButton = Button("Check for updates",host.CheckUpdates); CheckUpdateButton.IsEnabled = false;
+        InstallUpdateButton = Button("Update and restart",host.InstallUpdate); InstallUpdateButton.IsEnabled = false;
+        updateActions.Children.Add(CheckUpdateButton); updateActions.Children.Add(InstallUpdateButton); panel.Children.Add(updateActions);
+        panel.Children.Add(Button("Download installer",() => {
+            try { Process.Start(new ProcessStartInfo("https://github.com/ElliotDrel/pomodoro-bar/releases/latest/download/PomodoroBar-win-Setup.exe") { UseShellExecute = true }); }
+            catch (Exception ex) { Note("Could not open download: " + ex.Message); }
+        }));
         var actions = new UniformGrid { Columns = 2, Margin = new Thickness(0,12,0,0) };
         actions.Children.Add(Button("Quit",host.Quit)); actions.Children.Add(Button("Done",CloseEditor)); panel.Children.Add(actions);
         TimeCard.GotKeyboardFocus += (_,_) => { editing = true; dirty = false; };
@@ -77,6 +88,18 @@ internal sealed class EditorWindow : Window
     private static Button Button(string text,Action action)
     {
         var b = new Button { Content=text, Margin=new Thickness(3),Padding=new Thickness(9), Background=BarSurface.Brush("#343e54"),Foreground=BarSurface.Brush("#eef1fa"), BorderBrush=BarSurface.Brush("#46516a") };
+        var border = new FrameworkElementFactory(typeof(Border));
+        border.SetValue(Border.CornerRadiusProperty,new CornerRadius(4));
+        foreach (var pair in new[] { (Border.BackgroundProperty,"Background"), (Border.BorderBrushProperty,"BorderBrush"), (Border.PaddingProperty,"Padding") })
+            border.SetBinding(pair.Item1,new Binding(pair.Item2) { RelativeSource = RelativeSource.TemplatedParent });
+        border.SetValue(Border.BorderThicknessProperty,new Thickness(1));
+        var content = new FrameworkElementFactory(typeof(ContentPresenter));
+        content.SetValue(ContentPresenter.HorizontalAlignmentProperty,HorizontalAlignment.Center);
+        content.SetBinding(ContentPresenter.ContentProperty,new Binding("Content") { RelativeSource = RelativeSource.TemplatedParent });
+        border.AppendChild(content);
+        var template = new ControlTemplate(typeof(Button)) { VisualTree = border };
+        var disabled = new Trigger { Property = IsEnabledProperty, Value = false };
+        disabled.Setters.Add(new Setter(OpacityProperty,.45)); template.Triggers.Add(disabled); b.Template = template;
         b.Click += (_,_) => action(); return b;
     }
     internal void CancelEdit() { editing = false; dirty = false; Sync(); }
@@ -103,6 +126,12 @@ internal sealed class EditorWindow : Window
         ShowBar.IsChecked = host.Bar.IsVisible; ResizeBar.IsChecked = host.Bar.ResizeEnabled;
     }
     internal void Note(string text) => note.Text = text;
-    internal void UpdateStatus(string text) => update.Text = $"Version {BuildChannel.Version} · {text}";
+    internal void UpdateDetails(UpdateService service)
+    {
+        static string Stamp(DateTimeOffset? time) => time?.LocalDateTime.ToString("MMM d 'at' h:mm tt") ?? "Never";
+        update.Text = $"Version {BuildChannel.Version} · {service.State.Text}\nLast checked: {Stamp(service.LastCheckedAt)} · Last updated: {Stamp(service.LastUpdatedAt)}";
+        CheckUpdateButton.IsEnabled = service.CanUpdate && !service.IsBusy;
+        InstallUpdateButton.IsEnabled = service.CanUpdate && service.HasPending;
+    }
     private void CloseEditor() { if (FinishEdit()) Hide(); }
 }

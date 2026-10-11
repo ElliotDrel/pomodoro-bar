@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
 using PomodoroBar.Core;
@@ -25,9 +26,10 @@ internal sealed class AppHost : IDisposable
     private readonly InstanceServer? server;
     private bool disposed;
     private bool sessionTouched;
+    private bool restarting;
     public bool CanAutoRestart => !sessionTouched && !Timer.Running && !Timer.Waiting && !Editor.Editing;
 
-    public AppHost(Settings settings, string? settingsPath, IAudio audio, Func<double>? clock = null, bool services = true, bool smoke = false)
+    public AppHost(Settings settings, string? settingsPath, IAudio audio, Func<double>? clock = null, bool services = true, bool smoke = false, UpdateTrigger startupTrigger = UpdateTrigger.Launch)
     {
         Settings = settings; this.settingsPath = settingsPath; this.audio = audio;
         // TickCount64 advances across sleep; deadlines recover elapsed time on resume.
@@ -42,8 +44,9 @@ internal sealed class AppHost : IDisposable
         if (services) {
             if (!smoke) {
                 updates = new UpdateService();
-                updates.Status += text => Application.Current.Dispatcher.BeginInvoke(() => { if (!Closing) Editor.UpdateStatus(text); });
-                updates.ApplyRequested += () => Application.Current.Dispatcher.BeginInvoke(() => { if (CanAutoRestart) Restart(); });
+                updates.StateChanged += _ => Application.Current.Dispatcher.BeginInvoke(() => { if (!Closing) Editor.UpdateDetails(updates); });
+                updates.ApplyRequested += () => Application.Current.Dispatcher.BeginInvoke(() => { if (CanAutoRestart) InstallUpdate(); });
+                Editor.UpdateDetails(updates);
             }
             tray = new System.Windows.Forms.NotifyIcon {
                 Text = BuildChannel.DisplayName,
@@ -57,18 +60,21 @@ internal sealed class AppHost : IDisposable
             Item("Reset session",Reset);
             menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
             Item("Silence alarm",Silence);
-            if (!smoke) {
-                Item("Check for updates",() => _ = updates!.CheckAsync(UpdateTrigger.Manual));
-                Item("Restart / install update",() => Restart());
+            if (!smoke && updates?.CanUpdate == true) {
+                var checkItem = new System.Windows.Forms.ToolStripMenuItem("Check for updates",null,(_,_) => CheckUpdates());
+                var installItem = new System.Windows.Forms.ToolStripMenuItem("Install downloaded update",null,(_,_) => InstallUpdate());
+                menu.Items.Add(checkItem); menu.Items.Add(installItem); Item("Restart",Restart);
+                menu.Opening += (_,_) => { checkItem.Enabled = !updates.IsBusy; installItem.Enabled = updates.HasPending; };
             }
             Item("Quit",Quit);
             tray.ContextMenuStrip = menu; tray.DoubleClick += (_,_) => OpenEditor();
             if (!smoke) server = new InstanceServer(command => Application.Current.Dispatcher.InvokeAsync(() => {
-                if (command == "restart") { Log.Write("restart_command_received"); return Restart(); }
+                if (command == "restart") { Log.Write("restart_command_received"); if (updates?.CanUpdate != true) return false; Restart(); return true; }
+                if (command == "check") { if (updates?.CanUpdate != true) return false; CheckUpdates(); return true; }
                 if (command == "quit") { RequestQuit(); return true; }
                 ShowApp(); return true;
             }).Task);
-            if (!smoke) { _ = updates!.CheckAsync(UpdateTrigger.Launch); Log.Write("started"); }
+            if (!smoke) { _ = updates!.CheckAsync(startupTrigger); Log.Write("started"); }
         }
     }
     public void Tick()
@@ -137,12 +143,24 @@ internal sealed class AppHost : IDisposable
             Log.Write("settings_save_failed " + ex.Message); Report("Could not save settings: " + ex.Message); return false;
         }
     }
-    public bool Restart()
+    public void CheckUpdates() { if (updates is not null) _ = updates.CheckAsync(UpdateTrigger.Manual); }
+    public void Restart() => _ = RestartAsync(false);
+    public void InstallUpdate()
     {
-        if (updates?.CanUpdate != true) { Report("Restart updates require an installed production app."); return false; }
-        if (!Save() || !updates.PrepareRestart()) return false;
+        if (updates?.HasPending != true) { Report("Check for updates to download an update first."); return; }
+        _ = RestartAsync(true);
+    }
+    private async Task RestartAsync(bool applyUpdate)
+    {
+        if (restarting || Closing) return;
+        if (updates?.CanUpdate != true) { Report("Restart updates require an installed production app."); return; }
+        if (!Save()) return;
+        restarting = true;
+        bool prepared = await Task.Run(() => updates.PrepareRestart(applyUpdate,() => !Closing));
+        if (Closing) return;
+        if (!prepared) { restarting = false; return; }
         // Give the pipe server time to deliver its acknowledgement before exiting.
-        RequestQuit(); return true;
+        RequestQuit();
     }
     public void RequestQuit()
     {

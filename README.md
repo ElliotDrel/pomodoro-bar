@@ -6,7 +6,7 @@ A native Windows app with a small, always-on-top timer, a separate editor, and e
 
 Download **PomodoroBar-win-Setup.exe** from the [latest release](https://github.com/ElliotDrel/pomodoro-bar/releases/latest). Installation is per user without administrator rights, and includes the .NET runtime. Launch Pomodoro Bar from the Start menu or desktop shortcut. Requires 64-bit Windows 10 or later.
 
-Production uses Velopack, matching Universal Spell Check's release flow. It checks on launch and every four hours. Startup applies an available update only before you interact with the timer or editor; once you start a session, it stages the update for a later restart. Periodic checks also stage updates. The tray's **Restart / install update** installs a prepared update immediately. Restart starts a fresh paused focus period. The bar stays above ordinary windows; exclusive full-screen apps and secure screens can cover it.
+Production uses Velopack, matching Universal Spell Check's release flow. It checks on launch and every four hours. Startup downloads and applies an available update only before you interact with the timer or editor; once you start a session, it stages the update for later. Periodic and manual checks download in the background without restarting. The editor and tray offer **Check for updates** and installation of a verified downloaded update; the editor shows progress and last-checked/last-updated times. **Download installer** opens the latest public installer download. Restart starts a fresh paused focus period. The bar stays above ordinary windows; exclusive full-screen apps and secure screens can cover it.
 
 ## Floating bar
 
@@ -65,7 +65,7 @@ dotnet build src/PomodoroBar.csproj -c Release
 git diff --check
 ```
 
-`scripts/dev.ps1` starts Dev. Dev and Prod run side by side with separate instance locks, IPC, settings, titles, and tray labels. Dev never auto-updates; pull, rebuild, and relaunch manually. Tests exercise real WPF windows with silent fake audio plus the engine, parser, colors, layout, and migration. They require a Windows desktop session, never edit real settings, and never play alarms. Append `-- --capture` for ignored screenshots in `artifacts`.
+`scripts/dev.ps1` starts Dev. Dev and Prod run side by side with separate instance locks, IPC, settings, titles, and tray labels. Dev uses the same logo on a yellow icon background in the executable, windows, and tray. Dev never auto-updates and rejects update/restart commands; pull, rebuild, and relaunch manually. Tests exercise real WPF windows with silent fake audio plus the engine, parser, colors, layout, migration, and updater with fake packages/process helpers. They require a Windows desktop session, never edit real settings, and never play alarms. Append `-- --capture` for ignored screenshots in `artifacts`.
 
 ## Releases
 
@@ -75,4 +75,9 @@ Verify successful CI, a public non-draft release and installer/update assets, th
 
 Local installation must run from an ordinary Windows session outside a packaged app such as Codex. Packaged-process AppData virtualization can redirect an otherwise valid installer into the host's private cache. Run `scripts/verify-installation.ps1 -PreflightOnly` before installation, use `scripts/install-prod.ps1 -InstallerPath <published-setup.exe> -ExpectedVersion <version>`, and verify the physical installation and shortcut paths. The GitHub build and native window-icon checks alone do not establish desktop installation correctness.
 
-Installed `PomodoroBar.exe --restart` requests a graceful Velopack restart; `--update` is an alias. Exit zero acknowledges delivery; verify the fresh `started` log and installed version to confirm completion. `--quit` gracefully closes that channel's existing instance, and succeeds without starting one if none is running. `--startup-smoke` constructs native UI including the tray with silent audio and exits without reading/writing user settings or enabling IPC/updates.
+Installed `PomodoroBar.exe --restart` requests a graceful Velopack restart, then the startup check downloads/applies any newer release; `--update` is an alias, matching Universal Spell Checker. `--check-for-updates` checks and downloads without restarting; it starts the app in manual-check mode if none is running. Commands are forwarded to the existing instance, and a second instance never applies updates before forwarding. Exit zero acknowledges delivery; verify fresh logs and the installed version to confirm completion. `--quit` gracefully closes that channel's existing instance, and succeeds without starting one if none is running. `--startup-smoke` constructs native UI including the tray with silent audio and exits without reading/writing user settings or enabling IPC/updates.
+
+```powershell
+& "$env:LOCALAPPDATA\PomodoroBar\current\PomodoroBar.exe" --check-for-updates
+& "$env:LOCALAPPDATA\PomodoroBar\current\PomodoroBar.exe" --update
+```

@@ -26,7 +26,7 @@ internal sealed class InstanceServer : IDisposable
                 using var request = CancellationTokenSource.CreateLinkedTokenSource(stop.Token);
                 request.CancelAfter(TimeSpan.FromSeconds(5));
                 string? command = await reader.ReadLineAsync(request.Token);
-                bool accepted = command is "show" or "restart" or "quit" && await handler(command);
+                bool accepted = command is "show" or "restart" or "quit" or "check" && await handler(command);
                 await writer.WriteLineAsync(accepted ? "ok" : "error");
             } catch (OperationCanceledException) { }
             catch (Exception ex) {

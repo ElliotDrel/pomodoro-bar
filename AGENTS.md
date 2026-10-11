@@ -33,7 +33,8 @@ Native C#/.NET 10 Windows app: WPF windows, WinForms tray, Velopack installer/up
 | src/UpdateService.cs | Unified update/download/restart flow |
 | src/Audio.cs, sounds/ | Async Windows playback and bundled WAV chimes |
 | tests/ | Native engine, GUI, layout, migration and audio regression harness |
-| assets/ | App icon |
+| tests/UpdateFlowTests.cs | Fake-package updater regression tests; never run real helpers |
+| assets/ | Prod app icon and yellow-background Dev variant |
 | scripts/dev.ps1 | Dev run helper |
 | scripts/install-prod.ps1, scripts/verify-installation.ps1 | Unpackaged installation and physical-path/shortcut verification |
 | .github/workflows/ | Main checks and tagged production releases |

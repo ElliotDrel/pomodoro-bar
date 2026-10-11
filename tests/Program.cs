@@ -92,6 +92,7 @@ internal static class Tests
                 Check(StartupSettings.Load(path,Path.Combine(scratch,"badlegacy.json")).Warning is not null,"malformed legacy import recovers");
                 Reject(()=>(settings with { Focus=double.NaN }).Validate(),"reject corrupt duration");
                 Reject(()=>(settings with { Width=129 }).Validate(),"reject invalid geometry");
+                UpdateFlowTests.Run(scratch);
                 Gui(scratch,args.Contains("--capture"));
             } finally { Directory.Delete(scratch,true); }
             Console.WriteLine($"PASS: {count} assertions; timer, layout, migration, editor, audio and window behavior."); return 0;
