@@ -21,7 +21,7 @@ internal sealed class BarWindow : Window
         Title = BuildChannel.DisplayName;
         Icon = AppIcon.Source;
         WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.NoResize;
-        Topmost = true; ShowInTaskbar = true; Background = BarSurface.Brush("#171c28");
+        Topmost = true; ShowInTaskbar = true; Background = UiTheme.Background;
         MinWidth = 130; MinHeight = 20; MaxWidth = 1000; MaxHeight = 120;
         Surface = new BarSurface(host); Content = Surface;
         Width = host.Settings.Width; Height = host.Settings.Height;
@@ -30,9 +30,9 @@ internal sealed class BarWindow : Window
         SizeChanged += (_, _) => { Surface.InvalidateVisual(); host.ScheduleSave(); };
         LocationChanged += (_, _) => host.ScheduleSave();
         Closing += (_, e) => { if (!host.Closing) { e.Cancel = true; host.Silence(); Hide(); host.Render(); } };
-        var menu = new ContextMenu();
+        var menu = UiTheme.Menu();
         void Item(string text, Action action) { var item = new MenuItem { Header = text }; item.Click += (_, _) => { host.Silence(); action(); }; menu.Items.Add(item); }
-        Item("Edit timer", host.OpenEditor); Item("Reset session", host.Reset);
+        Item("Edit timer", host.OpenEditor); Item("Reset session", host.Reset); Item("Reset bar size",ResetSize);
         menu.Items.Add(new Separator()); Item("Quit", host.Quit); ContextMenu = menu;
         PreviewMouseDown += (_, _) => host.Silence();
         KeyDown += (_, e) => { if (e.Key == Key.Space) { host.Silence(); host.Toggle(); e.Handled = true; } };
@@ -70,11 +70,12 @@ internal sealed class BarSurface : FrameworkElement
     private readonly AppHost host;
     private BarLayout layout;
     private int pressed = -1;
+    private int hovered = -1;
     private bool dragArmed;
     private Point down;
     internal BarLayout Layout => layout;
     internal static SolidColorBrush Brush(string hex) => new((Color)ColorConverter.ConvertFromString(hex));
-    private static readonly Typeface Typeface = new(new FontFamily("Consolas"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal);
+    private static readonly Typeface Typeface = new(UiTheme.Digits, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
     public BarSurface(AppHost host)
     {
         this.host = host;
@@ -83,23 +84,26 @@ internal sealed class BarSurface : FrameworkElement
         MouseMove += Move;
         MouseLeftButtonUp += Release;
         LostMouseCapture += (_, _) => { pressed = -1; dragArmed = false; };
+        MouseLeave += (_,_) => { hovered = -1; InvalidateVisual(); };
         AutomationProperties.SetName(this, "Pomodoro timer. Space plays or pauses. Right-click opens controls.");
     }
     protected override void OnRender(DrawingContext dc)
     {
         var timer = host.Timer;
-        double pulse = host.Pulsing ? (.5 + .5 * Math.Sin(Environment.TickCount64 * Math.PI / 500d)) * .55 : 0;
+        double pulse = host.Pulsing ? (SystemParameters.ClientAreaAnimation ? .5 + .5 * Math.Sin(Environment.TickCount64 * Math.PI / 500d) : .6) * .55 : 0;
         byte Blend(byte a, byte b) => (byte)Math.Round(a+(b-a)*pulse);
-        dc.DrawRectangle(new SolidColorBrush(Color.FromRgb(Blend(23,255),Blend(28,188),Blend(40,112))), null, new Rect(RenderSize));
+        dc.DrawRectangle(UiTheme.Background,null,new Rect(RenderSize));
+        dc.DrawRoundedRectangle(new SolidColorBrush(Color.FromRgb(Blend(41,255),Blend(54,188),Blend(64,112))),
+            new Pen(host.Bar.ResizeEnabled ? UiTheme.Focus : UiTheme.Line,1),new Rect(.5,.5,Math.Max(0,ActualWidth-1),Math.Max(0,ActualHeight-1)),8,8);
         var rgb = VisualMath.CountdownColor(timer.Remaining / timer.Duration);
         var text = new FormattedText(TimerModel.FormatTime(timer.Remaining), CultureInfo.InvariantCulture, FlowDirection.LeftToRight, Typeface, 28,
             new SolidColorBrush(Color.FromRgb(rgb.R, rgb.G, rgb.B)), VisualTreeHelper.GetDpi(this).PixelsPerDip);
         layout = BarLayout.Fit(ActualWidth, ActualHeight, text.Width + 6);
         dc.PushTransform(new TranslateTransform(layout.Left, layout.Top));
         dc.PushTransform(new ScaleTransform(layout.Scale, layout.Scale));
-        var phase = Brush(timer.IsFocus ? "#9bafff" : "#66dbb7");
+        var phase = timer.IsFocus ? UiTheme.Focus : UiTheme.Rest;
         var pen = new Pen(phase, 3);
-        dc.DrawEllipse(null, new Pen(Brush("#343e54"), 3), new Point(22,26), 12,12);
+        dc.DrawEllipse(null, new Pen(UiTheme.Line, 3), new Point(22,26), 12,12);
         if (timer.Progress >= .9999) dc.DrawEllipse(null, pen, new Point(22,26),12,12);
         else if (timer.Progress > .0001) {
             double angle = timer.Progress * Math.PI * 2;
@@ -116,10 +120,16 @@ internal sealed class BarSurface : FrameworkElement
         } else dc.DrawEllipse(phase,null,new Point(22,26),2,2);
         dc.DrawText(text, new Point(40, (52-text.Height)/2));
         double x = 40 + layout.TimerWidth;
-        var glyph = new Pen(Brush("#eef1fa"), 2) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
+        for (int i = 0; i < 3; i++) {
+            var fill = i == 0 ? phase : hovered == i+2 ? UiTheme.Line : UiTheme.Surface;
+            dc.DrawRoundedRectangle(fill,null,new Rect(x+i*32+3,10,27,32),6,6);
+        }
+        if (hovered == 0) dc.DrawEllipse(null,new Pen(UiTheme.Ink,1),new Point(22,26),16,16);
+        var playGlyph = new Pen(UiTheme.Background,2) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
+        var glyph = new Pen(UiTheme.Ink, 2) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
         if (timer.Running) {
-            dc.DrawLine(glyph, new Point(x+12,19), new Point(x+12,33)); dc.DrawLine(glyph,new Point(x+20,19),new Point(x+20,33));
-        } else Triangle(dc, new Point(x+12,18), new Point(x+12,34), new Point(x+23,26), glyph.Brush);
+            dc.DrawLine(playGlyph, new Point(x+12,19), new Point(x+12,33)); dc.DrawLine(playGlyph,new Point(x+20,19),new Point(x+20,33));
+        } else Triangle(dc, new Point(x+12,18), new Point(x+12,34), new Point(x+23,26), playGlyph.Brush);
         x += 32;
         Triangle(dc, new Point(x+10,19), new Point(x+10,33), new Point(x+20,26), glyph.Brush);
         dc.DrawLine(glyph,new Point(x+23,19),new Point(x+23,33));
@@ -127,7 +137,6 @@ internal sealed class BarSurface : FrameworkElement
         dc.DrawLine(glyph,new Point(x+11,32),new Point(x+23,20));
         dc.DrawLine(new Pen(glyph.Brush,5),new Point(x+12,31),new Point(x+22,21));
         dc.DrawLine(glyph,new Point(x+9,35),new Point(x+14,34));
-        if (host.Bar.ResizeEnabled) dc.DrawRectangle(null, new Pen(Brush("#9bafff"),1),new Rect(.5,.5,layout.LogicalWidth-1,51));
         dc.Pop(); dc.Pop();
     }
     private static void Triangle(DrawingContext dc, Point a, Point b, Point c, Brush brush)
@@ -142,7 +151,9 @@ internal sealed class BarSurface : FrameworkElement
     private void Move(object sender, MouseEventArgs e)
     {
         var p = e.GetPosition(this);
-        Cursor = layout.Hit(p.X,p.Y) is 0 or 2 or 3 or 4 ? Cursors.Hand : Cursors.SizeAll;
+        int hit = layout.Hit(p.X,p.Y);
+        if (hovered != hit) { hovered = hit; InvalidateVisual(); }
+        Cursor = hit is 0 or 2 or 3 or 4 ? Cursors.Hand : Cursors.SizeAll;
         if (dragArmed && e.LeftButton == MouseButtonState.Pressed && (p-down).Length > 4) {
             pressed = -1; ReleaseMouseCapture();
             try { host.Bar.DragMove(); } catch (InvalidOperationException) { }

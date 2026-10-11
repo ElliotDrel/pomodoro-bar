@@ -53,7 +53,10 @@ internal sealed class AppHost : IDisposable
                 Icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath!) ?? System.Drawing.SystemIcons.Application,
                 Visible = true
             };
-            var menu = new System.Windows.Forms.ContextMenuStrip();
+            var menu = new System.Windows.Forms.ContextMenuStrip {
+                BackColor = System.Drawing.ColorTranslator.FromHtml("#293640"), ForeColor = System.Drawing.ColorTranslator.FromHtml("#F6F8F9"),
+                Renderer = new System.Windows.Forms.ToolStripProfessionalRenderer(new TrayColors())
+            };
             void Item(string text, Action action) => menu.Items.Add(text,null,(_,_) => action());
             Item("Edit timer",OpenEditor); Item("Show floating bar",() => { Bar.Show(); Render(); });
             Item("Play / pause",() => { Silence(); Toggle(); });
@@ -103,7 +106,7 @@ internal sealed class AppHost : IDisposable
     {
         if (minutes > 1440) { Editor.Note("Maximum session length is 24 hours."); return; }
         Editor.CancelEdit(); Settings = Settings with { Focus = minutes*50, Rest = minutes*10, Thresholds = thresholds };
-        Reset(); Save(); Editor.Note("New session is paused · press play to begin.");
+        Reset(); Save(); Editor.Note("Time set. Press play on the bar to begin.");
     }
     public void AddMinutes(int minutes) => SetSession((Timer.Focus+Timer.Rest)/60+minutes,Timer.Thresholds);
     public void SetTime(double seconds)

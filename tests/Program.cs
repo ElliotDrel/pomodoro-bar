@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -149,11 +150,38 @@ internal static class Tests
         Check(!host.Editor.Editing && host.Editor.TimeCard.Text=="07:41",$"invalid blurred draft cancels instead of trapping editor: editing={host.Editor.Editing} text={host.Editor.TimeCard.Text}");
         host.Save(); Near(Settings.Load(Path.Combine(scratch,"gui.json")).Rest,462,"custom break saves");
         host.Reset();Check(audio.Last is null,"reset stops audio");
+        var controls = Descendants<Button>(host.Editor).ToArray();
+        controls.Single(b => System.Windows.Automation.AutomationProperties.GetName(b).StartsWith("60 minutes:")).RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+        Near(host.Timer.Focus,3000,"redesigned 60-minute control invokes its preset");
+        controls.Single(b => b.Content is string label && label=="+5 min").RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+        Near(host.Timer.Focus+host.Timer.Rest,65*60,"redesigned addition control adjusts the active session");
+        host.Editor.ShowBar.IsChecked=false; host.Editor.ShowBar.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+        Check(!host.Bar.IsVisible && host.Editor.IsVisible,"visibility switch changes only the floating window");
+        host.Editor.ResizeBar.IsChecked=true; host.Editor.ResizeBar.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+        Check(host.Bar.IsVisible && host.Bar.ResizeEnabled,"resize switch reveals and unlocks the native bar");
+        host.Bar.SetResize(false);host.SetSession(30,[40,20]);host.Editor.CancelEdit();Pump();
+        var disclosure = Descendants<Expander>(host.Editor).Single();
+        var header = Descendants<System.Windows.Controls.Primitives.ToggleButton>(disclosure).Single();
+        header.IsChecked=true;Pump();
+        Check(disclosure.IsExpanded && host.Editor.CheckUpdateButton.IsVisible,"update disclosure reveals existing update controls");
+        header.IsChecked=false;Pump();Check(!disclosure.IsExpanded,"update disclosure closes independently of timer windows");
+        double editorWidth=host.Editor.Width,editorHeight=host.Editor.Height;
+        host.Editor.Width=host.Editor.MinWidth;host.Editor.Height=host.Editor.MinHeight;Pump();
+        var scroll=(ScrollViewer)host.Editor.Content;
+        scroll.ScrollToEnd();Pump();
+        Check(scroll.VerticalOffset>0 && scroll.ComputedVerticalScrollBarVisibility==Visibility.Collapsed,"small editor scrolls to lower controls without a visible scrollbar");
+        scroll.ScrollToTop();host.Editor.Width=editorWidth;host.Editor.Height=editorHeight;Pump();
         if(capture) {
             host.SetSession(30,[40,20]);host.Editor.CancelEdit();Pump();
             string root=Path.GetFullPath("artifacts");Directory.CreateDirectory(root);
             Capture(host.Editor,Path.Combine(root,"editor.png")); Capture(host.Bar,Path.Combine(root,"bar.png"));
             host.Bar.Width=130;host.Bar.Height=20;Pump();Capture(host.Bar,Path.Combine(root,"bar-tiny.png"));
+            disclosure.IsExpanded=true;host.Editor.Height=Math.Min(1000,SystemParameters.WorkArea.Height-40);Pump();Capture(host.Editor,Path.Combine(root,"editor-updates.png"));
+            host.Editor.Width=host.Editor.MinWidth;host.Editor.Height=host.Editor.MinHeight;Pump();scroll.ScrollToEnd();Pump();Capture(host.Editor,Path.Combine(root,"editor-small-bottom.png"));
+            scroll.ScrollToTop();disclosure.IsExpanded=false;host.SetTime(86400);Pump();Capture(host.Editor,Path.Combine(root,"editor-small-top.png"));
+            host.Editor.Width=editorWidth;host.Editor.Height=editorHeight;host.Bar.ResetSize();host.SetSession(30,[40,20]);host.Skip();Pump();Capture(host.Editor,Path.Combine(root,"editor-break.png"));
+            host.SetSession(30,[40,20]);host.Toggle();now+=1500;host.Tick();Pump();Capture(host.Editor,Path.Combine(root,"editor-complete.png"));
+            host.SetSession(30,[40,20]);Pump();
         }
         int calls=0;
         string testPipe = "PomodoroBar.Tests." + Guid.NewGuid().ToString("N");
@@ -191,6 +219,14 @@ internal static class Tests
     {
         var bitmap=new RenderTargetBitmap((int)window.ActualWidth,(int)window.ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render(window);
         var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));using var file=File.Create(path);encoder.Save(file);
+    }
+    private static IEnumerable<T> Descendants<T>(DependencyObject root) where T:DependencyObject
+    {
+        for(int i=0;i<VisualTreeHelper.GetChildrenCount(root);i++) {
+            var child=VisualTreeHelper.GetChild(root,i);
+            if(child is T match) yield return match;
+            foreach(var nested in Descendants<T>(child)) yield return nested;
+        }
     }
     private sealed class FakeAudio:IAudio {
         public string? Last;public bool Loop;

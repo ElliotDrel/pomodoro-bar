@@ -24,7 +24,8 @@ Native C#/.NET 10 Windows app: WPF windows, WinForms tray, Velopack installer/up
 | --- | --- |
 | src/Core/ | Deadline engine, parser, settings, safe startup recovery/migration, color/layout math |
 | src/BarWindow.cs | Floating drawing, hit targets, moving, native resizing |
-| src/EditorWindow.cs | Independent editor and protected time draft |
+| src/EditorWindow.cs | Independent instrument-panel editor, protected time draft and focus/break timeline |
+| src/UiTheme.cs | Shared palette, keyboard-focus button/switch/disclosure templates, and menu styling |
 | src/AppIcon.cs | Shared embedded icon for both native windows and their taskbar entries |
 | src/AppHost.cs | Controller, alerts, tray, lifecycle and settings |
 | src/Program.cs | Entry point, Velopack, singleton, migration, smoke mode |

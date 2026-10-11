@@ -25,13 +25,15 @@ Pomodoro Bar is one app with two independent windows, each available in the task
 
 Closing either window hides only that window and keeps the timer running. Reopen the bar from the tray's **Show floating bar** menu; reopen the editor by launching Pomodoro Bar again or double-clicking its tray icon. **Quit** exits the entire app.
 
-The editor uses light text on its dark background. Scrollbars stay hidden; scroll with the mouse wheel or navigate controls with Tab when the window is small.
+The editor uses a graphite instrument panel with white text, an ice-blue focus track, and a green break track. Its timeline shows the relative lengths and your position in the whole cycle. The large countdown remains directly editable. Buttons and switches have visible keyboard focus. Scrollbars stay hidden; scroll with the mouse wheel or navigate controls with Tab when the window is small.
 
 The large time card mirrors the countdown. Click the digits and enter minutes (`15`), `MM:SS` (`12:34`), or `HH:MM:SS` (`1:02:03`). Enter or clicking away saves; Escape cancels. Values range from one second to 24 hours. Saving sets the current section's length and remaining time, preserving running/paused state. The other section keeps its length. The bar keeps counting while the card protects your draft.
 
 **30 minutes**, **60 minutes**, **+1 minute**, **+5 minutes**, and **+10 minutes** create a fresh paused session. Plus buttons preserve a 5:1 focus/break ratio and current reminder percentages. Adding one minute to the 30-minute preset gives 25:50 focus and 05:10 break. Presets/additions allow a maximum 24-hour total.
 
-**Show floating bar** controls visibility independently of the editor; hidden timers keep running. Closing the editor preserves visibility. **Resize floating bar** enables native Windows sizing edges. Drag any edge/corner and turn it off to lock the borderless bar. All content and hit targets scale together. Default is 280 × 52, minimum 130 × 20, maximum 1000 × 120, in Windows device-independent pixels. **Reset bar size** restores the default without moving the bar or changing the timer. **Done** closes the editor; **Quit** exits. Appearance and reminders are handled by code.
+The **Show floating bar** switch controls visibility independently of the editor; hidden timers keep running. Closing the editor preserves visibility. **Resize using the bar’s edges** enables native Windows sizing edges. Drag any edge/corner and turn it off to lock the borderless bar. All content and hit targets scale together. Default is 280 × 52, minimum 130 × 20, maximum 1000 × 120, in Windows device-independent pixels. **Reset size** restores the default without moving the bar or changing the timer. **Done** closes the editor; **Quit app** exits. Appearance and reminders are handled by code.
+
+Expand **App updates** for update status, check/download actions, and last-checked/last-updated times. The floating bar and its right-click menu use the same palette as the editor; the tray menu also follows it. The bar keeps its circle, countdown, play/pause, skip, and pencil controls. Reminder motion respects the Windows animation preference; completion still requires acknowledgement and its sound loops until silenced.
 
 ## Reminders
 
@@ -67,7 +69,7 @@ dotnet build src/PomodoroBar.csproj -c Release
 git diff --check
 ```
 
-`scripts/dev.ps1` starts Dev. Dev and Prod run side by side with separate instance locks, IPC, settings, titles, and tray labels. Dev uses the same logo on a yellow icon background in the executable, windows, and tray. Dev never auto-updates and rejects update/restart commands; pull, rebuild, and relaunch manually. Tests exercise real WPF windows with silent fake audio plus the engine, parser, colors, layout, migration, and updater with fake packages/process helpers. They require a Windows desktop session, never edit real settings, and never play alarms. Append `-- --capture` for ignored screenshots in `artifacts`.
+`scripts/dev.ps1` starts Dev. Dev and Prod run side by side with separate instance locks, IPC, settings, titles, and tray labels. Dev uses the same logo on a yellow icon background in the executable, windows, and tray. Dev never auto-updates and rejects update/restart commands; pull, rebuild, and relaunch manually. Tests exercise real WPF windows with silent fake audio plus the engine, parser, colors, layout, migration, and updater with fake packages/process helpers. They also activate redesigned preset/switch controls, expand update controls, and scroll the minimum-size editor. They require a Windows desktop session, never edit real settings, and never play alarms. Append `-- --capture` for ignored screenshots in `artifacts`, including normal/tiny bars and editor focus, break, completion, expanded-update, and small-window states.
 
 ## Releases
 
