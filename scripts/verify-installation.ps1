@@ -1,4 +1,4 @@
-param([switch]$PreflightOnly, [string]$ExpectedVersion)
+param([switch]$PreflightOnly, [string]$ExpectedVersion, [switch]$VerifyShortcuts)
 $ErrorActionPreference = 'Stop'
 if (-not ('PomodoroInstallPaths' -as [type])) {
     Add-Type -TypeDefinition @'
@@ -41,4 +41,23 @@ try {
 } finally { $stream.Dispose() }
 $version = [Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $local 'PomodoroBar/current/PomodoroBar.dll')).ProductVersion.Split('+')[0]
 if ($ExpectedVersion -and $version -ne $ExpectedVersion) { throw "Expected $ExpectedVersion, installed $version" }
+if ($VerifyShortcuts) {
+    $shell = New-Object -ComObject WScript.Shell
+    $desktop = [Environment]::GetFolderPath('Desktop')
+    $menu = [Environment]::GetFolderPath('StartMenu')
+    $expected = @((Join-Path $desktop 'Pomodoro Bar.lnk'), (Join-Path $menu 'Programs/Pomodoro Bar.lnk'))
+    foreach ($path in $expected) {
+        if (-not (Test-Path -LiteralPath $path)) { throw "Missing canonical shortcut: $path" }
+        $link = $shell.CreateShortcut($path)
+        if ($link.TargetPath -ne $physical -or $link.Arguments -or $link.IconLocation -ne ($physical+',0')) { throw "Shortcut target/icon mismatch: $path" }
+    }
+    $stub = Join-Path $local 'PomodoroBar/Pomodoro Bar.exe'
+    $roots = @($desktop, [Environment]::GetFolderPath('CommonDesktopDirectory'), (Join-Path $env:USERPROFILE 'Desktop'), $menu, [Environment]::GetFolderPath('CommonStartMenu')) | Select-Object -Unique
+    foreach ($root in $roots) {
+        Get-ChildItem -LiteralPath $root -Filter '*.lnk' -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+            $link = $shell.CreateShortcut($_.FullName)
+            if ($_.FullName -notin $expected -and $link.TargetPath -in @($physical,$stub) -and -not $link.Arguments -and $_.FullName -notmatch '(?i)backup|BEFORE-|\.bak') { throw "Duplicate app shortcut: $($_.FullName)" }
+        }
+    }
+}
 [pscustomobject]@{ PhysicalExecutable=$physical; Version=$version; Packaged=$false }

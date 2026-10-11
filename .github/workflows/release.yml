@@ -46,6 +46,18 @@ jobs:
           vpk pack --packId PomodoroBar --packVersion ${{ steps.ver.outputs.semver }} `
             --packDir publish --mainExe PomodoroBar.exe --packTitle 'Pomodoro Bar' `
             --icon assets/PomodoroBar.ico
+      - name: Verify clean installer shortcuts
+        shell: pwsh
+        run: |
+          $setup = Resolve-Path Releases/PomodoroBar-win-Setup.exe
+          $p = Start-Process -FilePath $setup -ArgumentList '--silent' -WindowStyle Hidden -PassThru
+          $null = $p.Handle
+          try { $p | Wait-Process -Timeout 120 -ErrorAction Stop }
+          catch { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue; throw 'Installer verification timed out.' }
+          $p.Refresh()
+          if ($p.ExitCode -ne 0) { throw "Installer failed: $($p.ExitCode)" }
+          # Verify what the installer created before running any local repair helper.
+          & scripts/verify-installation.ps1 -ExpectedVersion '${{ steps.ver.outputs.semver }}' -VerifyShortcuts
       - name: Upload to GitHub Releases
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

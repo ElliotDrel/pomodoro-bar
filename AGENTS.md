@@ -39,6 +39,7 @@ Native C#/.NET 10 Windows app: WPF windows, WinForms tray, Velopack installer/up
 | assets/ | Prod app icon and yellow-background Dev variant |
 | scripts/dev.ps1 | Dev run helper |
 | scripts/install-prod.ps1, scripts/verify-installation.ps1 | Unpackaged installation and physical-path/shortcut verification |
+| scripts/repair-shortcuts.ps1 | Match installer shortcut targets and retire confirmed duplicate plain launchers safely |
 | scripts/background.ps1.vbs | Hidden PowerShell launcher for unpackaged installation/verification tasks |
 | .github/workflows/ | Main checks and tagged production releases |
 | .agents/skills/deploy/SKILL.md | Dev/release workflow and closeout |

@@ -23,7 +23,7 @@ Any bar interaction silences audio. Digits and pencil leave completion flashing;
 
 ## Editor
 
-Pomodoro Bar is one app with two independent windows, each available in the taskbar and Alt+Tab. Startup opens both the time-setting editor and floating bar. Launching the app again reopens both hidden windows and restores minimized windows without resetting the timer. Installation provides one desktop shortcut named **Pomodoro Bar** and removes the obsolete **Pomodoro Timer** shortcut when it targets this app.
+Pomodoro Bar is one app with two independent windows, each available in the taskbar and Alt+Tab. Startup opens both the time-setting editor and floating bar. Launching the app again reopens both hidden windows and restores minimized windows without resetting the timer. Installation provides one desktop shortcut and one Start Menu shortcut named **Pomodoro Bar**. Both target the same native executable, so application search can identify them as one app. The installation helper retains obsolete duplicate launch shortcuts outside Desktop/Start Menu indexing.
 
 Closing either window hides only that window and keeps the timer running. Reopen the bar from the tray's **Show floating bar** menu; reopen the editor by launching Pomodoro Bar again or double-clicking its tray icon. **Quit** exits the entire app.
 
@@ -77,7 +77,7 @@ git diff --check
 
 Finish verification and commit on `main`, then push `main` and the approved semver tag together. The [release workflow](.github/workflows/release.yml) runs tests, publishes self-contained `win-x64`, runs a bounded silent startup smoke test, packs with Velopack `1.2.161`, then uploads/publishes the GitHub release. Do not manually package production to bypass CI.
 
-Verify successful CI, a public non-draft release and installer/update assets, then install and verify local Prod. Leave Prod running, stop verification Dev instances, and verify every session commit is pushed. See [deployment instructions](.agents/skills/deploy/SKILL.md).
+Verify successful CI, a public non-draft release and installer/update assets, then install and verify local Prod. Release CI also silently installs on a clean Windows runner and checks the Desktop/Start Menu targets, icons, and duplicate launch shortcuts before upload. Leave Prod running, stop verification Dev instances, and verify every session commit is pushed. See [deployment instructions](.agents/skills/deploy/SKILL.md).
 
 Local installation must run from an ordinary Windows session outside a packaged app such as Codex. Packaged-process AppData virtualization can redirect an otherwise valid installer into the host's private cache. Run `scripts/verify-installation.ps1 -PreflightOnly` before installation, use `scripts/install-prod.ps1 -InstallerPath <published-setup.exe> -ExpectedVersion <version>`, and verify the physical installation and shortcut paths. The GitHub build and native window-icon checks alone do not establish desktop installation correctness. For an interactive Task Scheduler verification task, launch `wscript.exe` with `scripts/background.ps1.vbs` and the absolute verification script path; the wrapper creates PowerShell hidden from the outset and forwards its exit code.
 

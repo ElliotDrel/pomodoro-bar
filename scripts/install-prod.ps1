@@ -26,31 +26,9 @@ try {
     $installer = Start-Process -FilePath $InstallerPath -ArgumentList '--silent' -WindowStyle Hidden -Wait -PassThru
     if ($installer.ExitCode -ne 0) { throw "Installer exited $($installer.ExitCode)" }
     $verified = & (Join-Path $PSScriptRoot 'verify-installation.ps1') -ExpectedVersion $ExpectedVersion
-    $launcher = Join-Path $local 'PomodoroBar/Pomodoro Bar.exe'
-    $shell = New-Object -ComObject WScript.Shell
-    $desktop = [Environment]::GetFolderPath('Desktop')
-    $desktopLink = Join-Path $desktop 'Pomodoro Bar.lnk'
-    $links = @($desktopLink)
-    $pinned = Join-Path ([Environment]::GetFolderPath('ApplicationData')) 'Microsoft/Internet Explorer/Quick Launch/User Pinned/TaskBar'
-    Get-ChildItem -LiteralPath $pinned -Filter '*.lnk' -ErrorAction SilentlyContinue | ForEach-Object {
-        $candidate = $shell.CreateShortcut($_.FullName)
-        if ($candidate.TargetPath -match 'PomodoroBar') { $links += $_.FullName }
-    }
-    foreach ($path in $links) {
-        $link = $shell.CreateShortcut($path)
-        $link.TargetPath = $launcher; $link.Arguments = ''; $link.WorkingDirectory = Split-Path $launcher
-        $link.IconLocation = $verified.PhysicalExecutable + ',0'; $link.Description = 'Pomodoro Bar - native Windows timer'
-        $link.Save()
-        $check = $shell.CreateShortcut($path)
-        if ($check.TargetPath -ne $launcher -or $check.IconLocation -ne ($verified.PhysicalExecutable+',0')) { throw "Shortcut mismatch: $path" }
-    }
-    # Retire only the known prototype shortcut when it points to this app.
-    # Velopack already creates Pomodoro Bar; creating a second name duplicates it.
-    $legacyLink = Join-Path $desktop 'Pomodoro Timer.lnk'
-    if (Test-Path -LiteralPath $legacyLink) {
-        $legacy = $shell.CreateShortcut($legacyLink)
-        if ($legacy.TargetPath -match '\\PomodoroBar\\') { Remove-Item -LiteralPath $legacyLink }
-    }
+    $shortcuts = & (Join-Path $PSScriptRoot 'repair-shortcuts.ps1') -ExpectedVersion $ExpectedVersion
+    $launcher = $verified.PhysicalExecutable
+    $links = $shortcuts.Changed
     Start-Process -FilePath $launcher -WindowStyle Hidden
     $deadline = [DateTime]::UtcNow.AddSeconds(15)
     do {
