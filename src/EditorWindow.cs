@@ -15,10 +15,11 @@ internal sealed class EditorWindow : Window
     internal readonly TextBox TimeCard;
     internal readonly CheckBox ShowBar;
     internal readonly CheckBox ResizeBar;
-    private readonly TextBlock heading, session, status, note, update, focusLength, breakLength;
+    private readonly TextBlock heading, session, status, note, update, focusLength, breakLength, updateAction;
     private readonly CycleStrip cycle;
     internal readonly Button AlarmButton;
-    internal readonly Button CheckUpdateButton, InstallUpdateButton;
+    internal readonly Button UpdateButton;
+    private bool updateReady;
     private bool editing, dirty, syncing;
     internal bool Editing => editing;
     public EditorWindow(AppHost host)
@@ -77,19 +78,14 @@ internal sealed class EditorWindow : Window
         panel.Children.Add(ShowBar);
         ResizeBar = UiTheme.Switch("Resize using the bar’s edges");
         ResizeBar.Click += (_,_) => { if (ResizeBar.IsChecked == true) host.Bar.Show(); host.Bar.SetResize(ResizeBar.IsChecked == true); host.Render(); }; panel.Children.Add(ResizeBar);
-        var updatePanel = new StackPanel { Margin = new Thickness(0,10,0,0) };
-        update = UiTheme.Text($"Version {BuildChannel.Version}",12,ink:UiTheme.Muted); updatePanel.Children.Add(update);
-        var updateActions = new UniformGrid { Columns = 2, Margin = new Thickness(0,8,0,0) };
-        CheckUpdateButton = UiTheme.Button("Check for updates",host.CheckUpdates); CheckUpdateButton.IsEnabled = false;
-        InstallUpdateButton = UiTheme.Button("Update and restart",host.InstallUpdate,true); InstallUpdateButton.IsEnabled = false;
-        updateActions.Children.Add(CheckUpdateButton); updateActions.Children.Add(InstallUpdateButton); updatePanel.Children.Add(updateActions);
-        var updates = UiTheme.Disclosure("App updates",updatePanel);
-        panel.Children.Add(updates);
+        var updateRow = new DockPanel { Margin = new Thickness(0,20,0,0) };
+        updateAction = UiTheme.Text("Check for updates",12,true); updateAction.TextAlignment = TextAlignment.Center; updateAction.MaxWidth = 142;
+        UpdateButton = UiTheme.Button(updateAction,UpdateClicked);
+        UpdateButton.Width = 174; UpdateButton.MinHeight = 42; UpdateButton.IsEnabled = false;
+        UpdateButton.VerticalAlignment = VerticalAlignment.Center; DockPanel.SetDock(UpdateButton,Dock.Left); updateRow.Children.Add(UpdateButton);
+        update = UiTheme.Text($"Version {BuildChannel.Version}",11,ink:UiTheme.Muted); update.Margin = new Thickness(14,0,0,0);
+        update.VerticalAlignment = VerticalAlignment.Center; updateRow.Children.Add(update); panel.Children.Add(updateRow);
         note = UiTheme.Text("Set your time, then press play on the bar.",12,ink:UiTheme.Muted); note.Margin = new Thickness(0,14,0,8); panel.Children.Add(note);
-        var actions = new Grid(); actions.ColumnDefinitions.Add(new ColumnDefinition()); actions.ColumnDefinitions.Add(new ColumnDefinition());
-        var quit = UiTheme.Button("Quit app",host.Quit); quit.Background = Brushes.Transparent; quit.BorderBrush = Brushes.Transparent; quit.HorizontalAlignment = HorizontalAlignment.Left;
-        var done = UiTheme.Button("Done",CloseEditor,true); done.MinWidth = 112; done.HorizontalAlignment = HorizontalAlignment.Right; Grid.SetColumn(done,1);
-        actions.Children.Add(quit); actions.Children.Add(done); panel.Children.Add(actions);
         TimeCard.GotKeyboardFocus += (_,_) => { editing = true; dirty = false; };
         TimeCard.TextChanged += (_,_) => { if (editing && !syncing) dirty = true; };
         TimeCard.LostKeyboardFocus += (_,_) => { if (!FinishEdit()) CancelEdit(); };
@@ -137,12 +133,27 @@ internal sealed class EditorWindow : Window
         ShowBar.IsChecked = host.Bar.IsVisible; ResizeBar.IsChecked = host.Bar.ResizeEnabled;
     }
     internal void Note(string text) => note.Text = text;
+    private void UpdateClicked()
+    {
+        bool install = updateReady;
+        UpdateButton.IsEnabled = false;
+        updateAction.Text = install ? "Restarting…" : "Checking for update now";
+        AutomationProperties.SetName(UpdateButton,updateAction.Text);
+        if (install) host.InstallUpdate(); else host.CheckUpdates();
+    }
     internal void UpdateDetails(UpdateService service)
+        => UpdateDetails(service.State,service.CanUpdate,service.HasPending,service.LastCheckedAt,service.LastUpdatedAt);
+    internal void UpdateDetails(UpdateStatus state,bool canUpdate,bool hasPending,DateTimeOffset? checkedAt,DateTimeOffset? updatedAt)
     {
         static string Stamp(DateTimeOffset? time) => time?.LocalDateTime.ToString("MMM d 'at' h:mm tt") ?? "Never";
-        update.Text = $"Version {BuildChannel.Version}\n{service.State.Text}\nLast checked: {Stamp(service.LastCheckedAt)}\nLast updated: {Stamp(service.LastUpdatedAt)}";
-        CheckUpdateButton.IsEnabled = service.CanUpdate && !service.IsBusy;
-        InstallUpdateButton.IsEnabled = service.CanUpdate && service.HasPending;
+        update.Text = $"Version {BuildChannel.Version}\n{state.Text}\nLast checked: {Stamp(checkedAt)}\nLast updated: {Stamp(updatedAt)}";
+        updateReady = canUpdate && hasPending && state.Phase == UpdatePhase.Ready;
+        updateAction.Text = updateReady ? "Update and restart" : state.Phase == UpdatePhase.Checking ? "Checking for update now" : state.Phase == UpdatePhase.Downloading ? "Downloading update…" : "Check for updates";
+        UpdateButton.IsEnabled = canUpdate && state.Phase is not (UpdatePhase.Checking or UpdatePhase.Downloading);
+        UpdateButton.Background = updateReady ? UiTheme.Focus : UiTheme.Surface;
+        UpdateButton.BorderBrush = updateReady ? UiTheme.Focus : UiTheme.Line;
+        updateAction.Foreground = updateReady ? UiTheme.Background : UiTheme.Ink;
+        AutomationProperties.SetName(UpdateButton,updateAction.Text);
     }
     private void CloseEditor() { if (FinishEdit()) Hide(); }
 }

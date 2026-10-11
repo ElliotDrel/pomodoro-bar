@@ -101,36 +101,7 @@ internal static class UiTheme
         menu.Resources.Add(typeof(MenuItem),style);
         return menu;
     }
-    internal static Expander Disclosure(string label,UIElement content)
-    {
-        var headerFrame = new FrameworkElementFactory(typeof(Border),"headerFocus");
-        headerFrame.SetValue(Border.PaddingProperty,new Thickness(3,5,3,5));
-        headerFrame.SetValue(Border.BorderThicknessProperty,new Thickness(1)); headerFrame.SetValue(Border.BorderBrushProperty,Brushes.Transparent);
-        var headerRow = new FrameworkElementFactory(typeof(StackPanel)); headerRow.SetValue(StackPanel.OrientationProperty,Orientation.Horizontal);
-        var arrow = new FrameworkElementFactory(typeof(TextBlock),"arrow");
-        arrow.SetValue(TextBlock.TextProperty,"›"); arrow.SetValue(TextBlock.FontSizeProperty,18d); arrow.SetValue(TextBlock.ForegroundProperty,Focus);
-        arrow.SetValue(FrameworkElement.WidthProperty,20d); arrow.SetValue(FrameworkElement.RenderTransformOriginProperty,new Point(.4,.5));
-        headerRow.AppendChild(arrow);
-        var headerText = new FrameworkElementFactory(typeof(ContentPresenter)); headerText.SetBinding(ContentPresenter.ContentProperty,Parent("Content"));
-        headerText.SetValue(FrameworkElement.VerticalAlignmentProperty,VerticalAlignment.Center); headerRow.AppendChild(headerText); headerFrame.AppendChild(headerRow);
-        var headerTemplate = new ControlTemplate(typeof(System.Windows.Controls.Primitives.ToggleButton)) { VisualTree = headerFrame };
-        var open = new Trigger { Property = System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty, Value = true };
-        open.Setters.Add(new Setter(UIElement.RenderTransformProperty,new RotateTransform(90),"arrow")); headerTemplate.Triggers.Add(open);
-        var focus = new Trigger { Property = UIElement.IsKeyboardFocusedProperty, Value = true };
-        focus.Setters.Add(new Setter(Border.BorderBrushProperty,Focus,"headerFocus")); headerTemplate.Triggers.Add(focus);
-        var stack = new FrameworkElementFactory(typeof(StackPanel));
-        var header = new FrameworkElementFactory(typeof(System.Windows.Controls.Primitives.ToggleButton));
-        header.SetValue(Control.BackgroundProperty,Brushes.Transparent); header.SetValue(Control.ForegroundProperty,Ink);
-        header.SetValue(Control.CursorProperty,Cursors.Hand); header.SetValue(Control.TemplateProperty,headerTemplate);
-        header.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,new Binding("IsExpanded") { RelativeSource = RelativeSource.TemplatedParent, Mode = BindingMode.TwoWay });
-        header.SetBinding(ContentControl.ContentProperty,Parent("Header")); stack.AppendChild(header);
-        var body = new FrameworkElementFactory(typeof(ContentPresenter),"body"); body.SetBinding(ContentPresenter.ContentProperty,Parent("Content"));
-        body.SetValue(UIElement.VisibilityProperty,Visibility.Collapsed); stack.AppendChild(body);
-        var template = new ControlTemplate(typeof(Expander)) { VisualTree = stack };
-        var expanded = new Trigger { Property = Expander.IsExpandedProperty, Value = true };
-        expanded.Setters.Add(new Setter(UIElement.VisibilityProperty,Visibility.Visible,"body")); template.Triggers.Add(expanded);
-        return new Expander { Header = Text(label,13,true), Content = content, Foreground = Ink, Template = template, Margin = new Thickness(0,14,0,0) };
-    }
+
 }
 
 internal sealed class TrayColors : System.Windows.Forms.ProfessionalColorTable
