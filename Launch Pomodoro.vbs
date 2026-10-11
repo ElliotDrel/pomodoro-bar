@@ -1,21 +1,15 @@
 Option Explicit
-Dim shell, fso, folder, part, python, candidate
+Dim shell, fso, folder, executable, args, legacy
 Set shell = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
 folder = fso.GetParentFolderName(WScript.ScriptFullName)
-python = ""
-For Each part In Split(shell.Environment("PROCESS")("PATH"), ";")
-    If Len(part) > 0 Then
-        candidate = fso.BuildPath(Replace(part, """", ""), "pythonw.exe")
-        If fso.FileExists(candidate) Then
-            python = candidate
-            Exit For
-        End If
-    End If
-Next
-If Len(python) = 0 Then
-    MsgBox "Python could not be found. Install Python with Tkinter and add it to PATH.", 48, "Pomodoro Bar"
+executable = shell.ExpandEnvironmentStrings("%LOCALAPPDATA%\PomodoroBar\current\PomodoroBar.exe")
+If Not fso.FileExists(executable) Then
+    MsgBox "Install Pomodoro Bar from https://github.com/ElliotDrel/pomodoro-bar/releases/latest", 48, "Pomodoro Bar"
 Else
     shell.CurrentDirectory = folder
-    shell.Run """" & python & """ """ & fso.BuildPath(folder, "timer.pyw") & """", 0, False
+    args = """" & executable & """"
+    legacy = fso.BuildPath(folder, "settings.json")
+    If fso.FileExists(legacy) Then args = args & " --import-settings """ & legacy & """"
+    shell.Run args, 1, False
 End If

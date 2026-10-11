@@ -1,0 +1,17 @@
+name: Check
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet build src/PomodoroBar.csproj -c Dev
+      - run: dotnet run --project tests/PomodoroBar.Tests.csproj -c Release

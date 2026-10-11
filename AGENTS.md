@@ -2,28 +2,42 @@
 
 ## Project
 
-Pomodoro Bar is a standard-library Python/Tkinter Windows desktop timer. Keep the floating bar separate from the editor window. No third-party runtime dependencies are needed.
+Native C#/.NET 10 Windows app: WPF windows, WinForms tray, Velopack installer/updater. This supersedes Python/Tkinter. Keep the floating bar separate from the editor. Release installers bundle .NET.
 
-## Behavior to preserve
+## Preserve
 
-- Scale the circle, countdown, controls, and hit targets together; support the minimum 130 x 20 pixel bar.
-- Keep the editor's time card synchronized with the floating bar while protecting text being edited.
-- The 30-minute preset is 25 minutes focus plus 5 minutes break; the 60-minute preset is 50 plus 10.
-- Assign reminder sounds backward from the last reminder. Completion audio loops until a bar interaction silences it.
-- Use asynchronous audio; never block Tk's event loop with playback or sleeping.
-- Keep local settings out of commits. Do not overwrite user settings when updating the app.
+- Uniformly scale circle, countdown, controls, and hit targets down to 130 × 20 DIPs.
+- Mirror the countdown in the editor without overwriting a draft.
+- Presets: 30 total = 25/5; 60 total = 50/10. Additions preserve 5:1 ratio and reminder percentages.
+- Assign sounds backward; completion loops until a bar interaction silences audio. Completion waits for acknowledgement; coalesce delayed reminders.
+- Audio/update work must not block the dispatcher.
+- Channel identity, paths, locks, IPC belong in `BuildChannel.cs`. Dev never auto-updates.
+- Settings live in channel-specific LocalAppData outside the installer-owned root; preserve them on updates.
+- One update flow: `UpdateService.CheckAsync`; launch applies, periodic stages.
 
 ## Files
 
-| File | Purpose |
+| Path | Purpose |
 | --- | --- |
-| timer.pyw | Window UI, countdown engine, settings, and audio playback/synthesis |
-| Launch Pomodoro.vbs | Discover Python on PATH and launch without a terminal |
-| test_timer.py | Timer, GUI behavior, layout, and audio regression tests |
-| sounds/*.wav | Bundled synthesized reminder and completion sounds |
-| README.md | Installation, controls, and behavior |
-| .gitignore | Excludes machine-local settings and Python caches |
+| src/Core/ | Deadline engine, parser, settings, safe startup recovery/migration, color/layout math |
+| src/BarWindow.cs | Floating drawing, hit targets, moving, native resizing |
+| src/EditorWindow.cs | Independent editor and protected time draft |
+| src/AppHost.cs | Controller, alerts, tray, lifecycle and settings |
+| src/Program.cs | Entry point, Velopack, singleton, migration, smoke mode |
+| src/BuildChannel.cs, src/Log.cs | Channel identity, paths and diagnostics |
+| src/InstanceServer.cs | Current-user relaunch/restart IPC |
+| src/UpdateService.cs | Unified update/download/restart flow |
+| src/Audio.cs, sounds/ | Async Windows playback and bundled WAV chimes |
+| tests/ | Native engine, GUI, layout, migration and audio regression harness |
+| assets/ | App icon |
+| scripts/dev.ps1 | Dev run helper |
+| .github/workflows/ | Main checks and tagged production releases |
+| .agents/skills/deploy/SKILL.md | Dev/release workflow and closeout |
+| Launch Pomodoro.vbs | Compatibility launcher for installed native Prod |
+| README.md | Install, controls, migration, development, releases |
 
-## Verification
+## Verification and publishing
 
-Run `python test_timer.py` on an interactive Windows desktop and `git diff --check` before committing. Audio tests use a fake playback backend; do not introduce audible alarms into the test suite. Update the README when user-facing controls or behavior change.
+Run `dotnet run --project tests/PomodoroBar.Tests.csproj -c Release`, Dev and Release builds, and `git diff --check` before committing. Tests require Windows and silent fake audio. Rebuild/relaunch native changes. Update README and the file map for changed controls/files.
+
+Read `.agents/skills/deploy/SKILL.md` when publishing. Use the user-requested branch and meaningful commits. Semver tags trigger CI/Velopack upload; verify public release and installed local Prod before closeout. Stop only session-owned Dev instances/scratch. Never delete backups without explicit per-file permission.

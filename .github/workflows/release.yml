@@ -1,0 +1,56 @@
+name: Release
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Compute version
+        id: ver
+        shell: pwsh
+        run: |
+          $tag = '${{ github.ref_name }}'
+          if ($tag -notmatch '^v\d+\.\d+\.\d+$') { throw 'Release must run from a semver tag.' }
+          "semver=$($tag.Substring(1))" >> $env:GITHUB_OUTPUT
+      - name: Native regression tests
+        run: dotnet run --project tests/PomodoroBar.Tests.csproj -c Release
+      - name: Publish
+        shell: pwsh
+        run: |
+          dotnet publish src/PomodoroBar.csproj -c Release -r win-x64 --self-contained true `
+            /p:Version=${{ steps.ver.outputs.semver }} `
+            /p:AssemblyVersion=${{ steps.ver.outputs.semver }}.0 `
+            /p:FileVersion=${{ steps.ver.outputs.semver }}.0 -o publish
+      - name: Startup smoke test
+        shell: pwsh
+        run: |
+          $p = Start-Process publish/PomodoroBar.exe -ArgumentList '--startup-smoke' -PassThru
+          $null = $p.Handle
+          try { $p | Wait-Process -Timeout 60 -ErrorAction Stop }
+          catch { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue; throw 'Startup smoke timed out.' }
+          $p.Refresh()
+          if ($p.ExitCode -ne 0) { throw "Startup smoke failed: $($p.ExitCode)" }
+      - name: Install vpk
+        run: dotnet tool install --global vpk --version 1.2.161
+      - name: Pack
+        shell: pwsh
+        run: |
+          vpk pack --packId PomodoroBar --packVersion ${{ steps.ver.outputs.semver }} `
+            --packDir publish --mainExe PomodoroBar.exe --packTitle 'Pomodoro Bar' `
+            --icon assets/PomodoroBar.ico
+      - name: Upload to GitHub Releases
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          vpk upload github --repoUrl '${{ github.server_url }}/${{ github.repository }}' `
+            --token $env:GITHUB_TOKEN --tag '${{ github.ref_name }}' `
+            --releaseName 'Pomodoro Bar ${{ github.ref_name }}' --publish
