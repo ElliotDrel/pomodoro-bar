@@ -3,6 +3,7 @@
 ## Latest release: 1.1.3
 
 - Open the [public release](https://github.com/ElliotDrel/pomodoro-bar/releases/tag/v1.1.3) for the installer, portable build, and update files.
+- View the [successful release workflow](https://github.com/ElliotDrel/pomodoro-bar/actions/runs/38158669961) and [main checks](https://github.com/ElliotDrel/pomodoro-bar/actions/runs/38158669982).
 - Run the finished native app with the redesigned editor, floating bar, switches, and menus.
 - Check the implementation with 158 regression assertions, Dev/Release builds, rendered UI captures, and a self-contained startup smoke test.
 
