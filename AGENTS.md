@@ -48,6 +48,7 @@ Native C#/.NET 10 Windows app: WPF windows, WinForms tray, Velopack installer/up
 | README.md | Install, controls, migration, development, releases |
 | CHANGELOG.md | Dated version/channel history, Unreleased changes, and source for public release notes |
 | REQUEST-CHECKLIST.md | Complete user-request verification checklist and unimplemented proposals |
+| RESOURCE-AUDIT.md | Measured CPU/RAM baseline, refresh experiments, and prioritized optimization suggestions |
 | scripts/changelog.ps1 | Validate log updates and dated release entries; extract version-specific notes |
 | tests/Changelog.Tests.ps1 | Release-note extraction and missing-log/invalid-history regression fixtures |
 

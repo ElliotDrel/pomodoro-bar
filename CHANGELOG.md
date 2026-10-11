@@ -8,7 +8,7 @@ See [the request checklist](REQUEST-CHECKLIST.md) for the complete feature revie
 
 ## [Unreleased]
 
-- No pending changes.
+- Audit installed 1.1.5 CPU/RAM and isolated refresh scenarios in `RESOURCE-AUDIT.md`; identify state-aware refresh, hidden-window suppression, cached drawing, and native UI options. Keep app behavior and installed Prod unchanged.
 
 ## [1.1.5] - 2026-10-11
 
