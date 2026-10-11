@@ -22,8 +22,8 @@ internal sealed class AppHost : IDisposable
     private readonly Func<DateTimeOffset> wallClock;
     internal DateTimeOffset Now => wallClock();
     private readonly IAudio audio;
-    private readonly DispatcherTimer tick, save;
-    private readonly System.Windows.Forms.NotifyIcon? tray;
+    private readonly DispatcherTimer tick, save, animation;
+    private readonly NativeTray? tray;
     private readonly UpdateService? updates;
     private readonly InstanceServer? server;
     private bool disposed;
@@ -40,10 +40,20 @@ internal sealed class AppHost : IDisposable
         Timer = new TimerModel(settings.Focus,settings.Rest,settings.Thresholds,this.clock);
         save = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
         save.Tick += (_,_) => { save.Stop(); Save(); };
+        tick = new DispatcherTimer();
+        tick.Tick += (_,_) => { WakeCallbackCount++; Tick(); };
+        animation = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+        animation.Tick += (_,_) => {
+            if (Closing) { animation.Stop(); return; }
+            if (Visible(Bar)) Bar!.Surface.InvalidateVisual();
+            if (!Pulsing || !Visible(Bar) || !SystemParameters.ClientAreaAnimation) animation.Stop();
+        };
         Bar = new BarWindow(this); Editor = new EditorWindow(this);
-        tick = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
-        tick.Tick += (_,_) => Tick();
-        Bar.Show(); ShowEditor(); tick.Start();
+        Bar.IsVisibleChanged += (_,_) => Tick(); Editor.IsVisibleChanged += (_,_) => Tick();
+        Bar.StateChanged += (_,_) => Tick(); Editor.StateChanged += (_,_) => Tick();
+        Microsoft.Win32.SystemEvents.PowerModeChanged += PowerChanged;
+        Microsoft.Win32.SystemEvents.TimeChanged += TimeChanged;
+        Bar.Show(); ShowEditor(); Render();
         if (services) {
             if (!smoke) {
                 updates = new UpdateService();
@@ -51,29 +61,19 @@ internal sealed class AppHost : IDisposable
                 updates.ApplyRequested += () => Application.Current.Dispatcher.BeginInvoke(() => { if (CanAutoRestart) InstallUpdate(); });
                 Editor.UpdateDetails(updates);
             }
-            tray = new System.Windows.Forms.NotifyIcon {
-                Text = BuildChannel.DisplayName,
-                Icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath!) ?? System.Drawing.SystemIcons.Application,
-                Visible = true
-            };
-            var menu = new System.Windows.Forms.ContextMenuStrip {
-                BackColor = System.Drawing.ColorTranslator.FromHtml("#293640"), ForeColor = System.Drawing.ColorTranslator.FromHtml("#F6F8F9"),
-                Renderer = new System.Windows.Forms.ToolStripProfessionalRenderer(new TrayColors())
-            };
-            void Item(string text, Action action) => menu.Items.Add(text,null,(_,_) => action());
+            tray = new NativeTray(OpenEditor);
+            void Item(string text, Action action) => tray.Item(text,action);
             Item("Edit timer",OpenEditor); Item("Show floating bar",() => { Bar.Show(); Render(); });
             Item("Play / pause",() => { Silence(); Toggle(); });
             Item("Reset session",Reset);
-            menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
+            tray.Separator();
             Item("Silence alarm",Silence);
             if (!smoke && updates?.CanUpdate == true) {
-                var checkItem = new System.Windows.Forms.ToolStripMenuItem("Check for updates",null,(_,_) => CheckUpdates());
-                var installItem = new System.Windows.Forms.ToolStripMenuItem("Install downloaded update",null,(_,_) => InstallUpdate());
-                menu.Items.Add(checkItem); menu.Items.Add(installItem); Item("Restart",Restart);
-                menu.Opening += (_,_) => { checkItem.Enabled = !updates.IsBusy; installItem.Enabled = updates.HasPending; };
+                tray.Item("Check for updates",CheckUpdates,() => !updates.IsBusy);
+                tray.Item("Install downloaded update",InstallUpdate,() => updates.HasPending);
+                Item("Restart",Restart);
             }
             Item("Quit",Quit);
-            tray.ContextMenuStrip = menu; tray.DoubleClick += (_,_) => OpenEditor();
             if (!smoke) server = new InstanceServer(command => Application.Current.Dispatcher.InvokeAsync(() => {
                 if (command == "restart") { Log.Write("restart_command_received"); if (updates?.CanUpdate != true) return false; Restart(); return true; }
                 if (command == "check") { if (updates?.CanUpdate != true) return false; CheckUpdates(); return true; }
@@ -85,6 +85,8 @@ internal sealed class AppHost : IDisposable
     }
     public void Tick()
     {
+        if (Closing) return;
+        tick.Stop();
         string? sound = Timer.Tick();
         PlayEvent(sound);
         Render();
@@ -117,7 +119,41 @@ internal sealed class AppHost : IDisposable
         sessionTouched = true; Timer.SetTime(seconds); Silence(); pulseUntil = 0;
         Settings = Settings with { Focus = Timer.Focus, Rest = Timer.Rest }; Save(); Render();
     }
-    public void Render() { Bar.Surface.InvalidateVisual(); Editor.Sync(); }
+    private static bool Visible(Window? window) => window is not null && window.IsVisible && window.WindowState != WindowState.Minimized;
+    internal bool WakeScheduled => tick.IsEnabled;
+    internal long WakeCallbackCount { get; private set; }
+    internal TimeSpan WakeInterval => tick.Interval;
+    internal bool AnimationScheduled => animation.IsEnabled;
+    public void Render()
+    {
+        if (Closing) return;
+        if (Visible(Bar)) Bar.Surface.Refresh();
+        if (Visible(Editor)) Editor.Sync();
+        if (Pulsing && Visible(Bar) && SystemParameters.ClientAreaAnimation) animation.Start(); else animation.Stop();
+        ScheduleWake();
+    }
+    internal void ScheduleWake()
+    {
+        if (Closing) return;
+        tick.Stop();
+        double seconds = Timer.SecondsUntilNextEvent();
+        if (Timer.Running && (Visible(Bar) || Visible(Editor))) {
+            double fraction = Timer.Remaining - Math.Floor(Timer.Remaining);
+            seconds = Math.Min(seconds, fraction > .001 ? fraction : 1);
+        }
+        if (Visible(Editor)) seconds = Math.Min(seconds, Editor.SecondsUntilPreviewChange());
+        if (double.IsPositiveInfinity(seconds)) return;
+        tick.Interval = TimeSpan.FromSeconds(Math.Max(.01, seconds)); tick.Start();
+    }
+    private void PowerChanged(object? sender, Microsoft.Win32.PowerModeChangedEventArgs e)
+    {
+        if (e.Mode == Microsoft.Win32.PowerModes.Resume) QueueClockRefresh();
+    }
+    private void TimeChanged(object? sender, EventArgs e) => QueueClockRefresh();
+    private void QueueClockRefresh()
+    {
+        if (!Closing) Application.Current.Dispatcher.BeginInvoke(() => { if (!Closing) Tick(); });
+    }
     public void ShowApp()
     {
         Bar.Show();
@@ -181,12 +217,14 @@ internal sealed class AppHost : IDisposable
     private void Report(string text)
     {
         Editor.Note(text);
-        if (!Editor.IsVisible) tray?.ShowBalloonTip(5000,BuildChannel.DisplayName,text,System.Windows.Forms.ToolTipIcon.Warning);
+        if (!Editor.IsVisible) tray?.ShowWarning(BuildChannel.DisplayName,text);
     }
     public void Dispose()
     {
         if (disposed) return; disposed = true; Closing = true;
-        tick.Stop(); save.Stop(); server?.Dispose(); updates?.Dispose(); audio.Dispose();
+        tick.Stop(); animation.Stop(); save.Stop(); server?.Dispose(); updates?.Dispose(); audio.Dispose();
+        Microsoft.Win32.SystemEvents.PowerModeChanged -= PowerChanged;
+        Microsoft.Win32.SystemEvents.TimeChanged -= TimeChanged;
         tray?.Dispose(); Editor.Close(); Bar.Close();
     }
 }

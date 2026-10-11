@@ -17,6 +17,13 @@ internal static class UiTheme
     internal static readonly SolidColorBrush Muted = Color("#B5C6CF");
     internal static readonly SolidColorBrush Focus = Color("#96D3E4");
     internal static readonly SolidColorBrush Rest = Color("#A7DABB");
+    internal static readonly SolidColorBrush Warning = Color("#FFAE66");
+    internal static Pen Pen(Brush brush, double width, bool round = false)
+    {
+        var pen = new Pen(brush,width);
+        if (round) { pen.StartLineCap = PenLineCap.Round; pen.EndLineCap = PenLineCap.Round; }
+        pen.Freeze(); return pen;
+    }
     internal static readonly FontFamily Display = new("Bahnschrift, Segoe UI");
     internal static readonly FontFamily Digits = new("Cascadia Mono, Consolas");
     internal static SolidColorBrush Color(string hex)
@@ -102,18 +109,4 @@ internal static class UiTheme
         return menu;
     }
 
-}
-
-internal sealed class TrayColors : System.Windows.Forms.ProfessionalColorTable
-{
-    private static System.Drawing.Color Paint(string hex) => System.Drawing.ColorTranslator.FromHtml(hex);
-    public override System.Drawing.Color ToolStripDropDownBackground => Paint("#293640");
-    public override System.Drawing.Color ImageMarginGradientBegin => ToolStripDropDownBackground;
-    public override System.Drawing.Color ImageMarginGradientMiddle => ToolStripDropDownBackground;
-    public override System.Drawing.Color ImageMarginGradientEnd => ToolStripDropDownBackground;
-    public override System.Drawing.Color MenuItemSelected => Paint("#485B68");
-    public override System.Drawing.Color MenuItemBorder => Paint("#96D3E4");
-    public override System.Drawing.Color MenuBorder => Paint("#485B68");
-    public override System.Drawing.Color SeparatorDark => MenuBorder;
-    public override System.Drawing.Color SeparatorLight => MenuBorder;
 }

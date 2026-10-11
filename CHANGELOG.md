@@ -8,7 +8,12 @@ See [the request checklist](REQUEST-CHECKLIST.md) for the complete feature revie
 
 ## [Unreleased]
 
-- Audit installed 1.1.5 CPU/RAM and isolated refresh scenarios in `RESOURCE-AUDIT.md`; identify state-aware refresh, hidden-window suppression, cached drawing, and native UI options. Keep app behavior and installed Prod unchanged.
+- Record the installed 1.1.5 CPU/RAM baseline and isolated refresh scenarios in `RESOURCE-AUDIT.md` before making optimizations; preserve the original measurements and their limitations.
+- Replace continuous 10 Hz UI polling with state-aware countdown, milestone, and rounded end-preview scheduling; skip hidden/minimized UI and animate only visible alerts. Catch up on Windows resume and clock changes.
+- Cache countdown layout/text, immutable drawing resources, session labels, and parsed drafts. Preserve immediate draft previews, completion acknowledgement, independent windows, and uniformly scaled controls.
+- Replace WinForms tray/monitor dependencies with native shell and monitor interop, using the embedded channel icon, native menu actions, keyboard activation, and Explorer restart recovery.
+- Add scheduling/tray regressions and a reproducible silent seven-state resource harness; measure old and optimized builds sequentially before publishing performance claims.
+- Verify 191 native assertions, eight changelog assertions, clean Dev/Release builds, self-contained Release and Dev startup smoke, and normal/tiny/editor UI captures. Record 18–24% lower resident RAM and 78–98% lower allocation churn in the matched seven-state runs; preserve visible-running CPU variability and the rejected software-rendering tradeoff in the audit.
 
 ## [1.1.5] - 2026-10-11
 

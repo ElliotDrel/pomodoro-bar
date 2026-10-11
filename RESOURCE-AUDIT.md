@@ -35,7 +35,7 @@
 - Observe no large RAM reduction when dispatching stops; retained UI/framework memory remains. The isolated process excludes production services and has different lifetimes/geometry/visibility, so its 124–127 MiB is not a replacement for the installed 153 MiB baseline.
 - Include the measurement harness's own asynchronous sampling and JSON bookkeeping in these process metrics; the approximately 5 KiB/sec stopped-refresh allocation floor is not purely application allocation.
 
-## Root Causes
+## Baseline Root Causes
 
 - Find unconditional **100 ms dispatching** in `src/AppHost.cs`: `Tick()` calls `Render()` even when `Timer.Tick()` has nothing to do because the timer is paused.
 - Find unconditional refresh of both windows in `Render()`: invalidate the bar and call `Editor.Sync()` regardless of visibility or changed values.
@@ -77,8 +77,52 @@
 - Keep startup/update spikes separate from steady-state timer costs; measure downloaded-update staging independently.
 - Preserve current installation identity, Dev/Prod isolation, one shortcut, and two startup windows.
 
-## Audit Deliverables
+## Initial Audit Deliverables
 
 - Add this measured report and record the audit in the versioned changelog.
 - Leave application source, version, installed Prod, settings, and release assets unchanged.
 - Pass existing native and changelog regressions and Dev/Release builds before committing the documentation.
+
+## Implemented WPF Optimizations
+
+- Keep WPF as selected; retain one installed product and two independent windows.
+- Replace unconditional 10 Hz dispatching with one-shot scheduling for visible countdown seconds, hidden milestones, and rounded paused/draft end-preview changes.
+- Refresh on window restoration, Windows resume, and wall-clock changes; preserve monotonic deadlines and coalesced delayed reminders.
+- Animate only the visible bar during reminder/completion warnings; keep hidden completion audio independent of UI scheduling.
+- Cache formatted bar text, layout transforms, pens, progress/button geometry, editor duration labels, color brushes, and parsed draft values.
+- Replace WinForms tray and monitor enumeration with native Windows shell/monitor APIs. Use the same embedded channel icon and release owned native icons/menus/windows on disposal.
+- Preserve the original audit tables above as historical evidence; the remaining radical options are alternatives, not implemented product features.
+
+### Matched Measurements
+
+- Compare pre-optimization commit `8e7aac4` with the optimized WPF build using the same tracked `tests/ResourceAudit.cs` harness.
+- Run the old build's seven scenarios first, then the optimized build's seven scenarios, with ten-second warmups and thirty samples each. Do not overlap these passes with builds.
+- Include a real tray and both window classes; disable updater/IPC, user-settings access, and actual sound playback with `smoke:true`, no settings path, and fake audio.
+- Retain raw readings locally at `artifacts/resource-audit/matched-baseline.json` and `matched-optimized.json`.
+
+| Scenario | CPU before → after | Resident MiB before → after | Allocation KiB/sec before → after |
+| --- | ---: | ---: | ---: |
+| Paused, both visible | 0.522% → 0.129% | 134.8 → 105.0 | 242.8 → 6.4 |
+| Running, bar only | 0.380% → 0.548% | 147.1 → 112.5 | 289.8 → 18.5 |
+| Running, both visible | 0.373% → 0.399% | 150.5 → 120.7 | 289.0 → 36.0 |
+| Running, both hidden | 0.142% → 0.077% | 142.5 → 114.2 | 289.7 → 5.3 |
+| Paused, both hidden | 0.288% → 0.067% | 142.8 → 112.1 | 239.7 → 5.0 |
+| Running, active draft | 0.428% → 0.441% | 145.9 → 120.1 | 367.6 → 81.7 |
+| Completion, both visible, silent audio | 0.810% → 0.246% | 146.7 → 117.8 | 438.7 → 54.2 |
+
+- Observe roughly **18–24% lower resident memory** across these cases and **78–98% lower allocation churn**.
+- Observe lower paused, hidden, and completion CPU; retain the visible-running increases in the table rather than claiming every state improved.
+- Treat the sampling/JSON harness overhead, sequential process aging, foreground policy, driver behavior, and background system activity as limitations. These are short runs on one machine, not a total-system power measurement or a production leak test.
+- Confirm the optimized harness does not load `System.Windows.Forms` or `System.Drawing.Common`; do not attribute the entire RAM difference to any single change.
+- Keep actual audio/update costs outside these silent steady-state comparisons. Their behavior remains covered by separate regressions.
+
+### Follow-up: Running-Bar CPU and Renderer
+
+- Repeat the bar-only comparison with per-thread CPU and scheduler/render counters. Record zero for counters unavailable in the old build; do not interpret those old-build zeros as zero refreshes.
+- Record old/default rendering at **0.762% total CPU**, **126.9 MiB resident**, and **286.1 KiB/sec allocation** over 30.78 seconds.
+- Record optimized/default rendering at **0.612% total CPU**, **107.8 MiB resident**, and **20.4 KiB/sec allocation** over 30.33 seconds.
+- Confirm **30 scheduler wakes**, **30 bar renders**, and **zero hidden-editor syncs** in the optimized run.
+- Record UI-thread CPU of **0.6875 seconds before** versus **0.15625 seconds after**, approximately **77% lower**. Other existing threads consumed about 1.20 versus 1.34 CPU seconds; their modules could not be resolved, so do not claim exact driver/runtime attribution.
+- Test optimized/software rendering: **0.729% total CPU**, **87.6 MiB resident**, **20.2 KiB/sec allocation**, and 30 wakes/renders. Keep default rendering because this run showed a CPU tradeoff despite additional RAM savings.
+- Retain the three `repeat-*.json` files in local ignored `artifacts/resource-audit/`. Treat these as repeated short runs, with clear visible-running variability rather than a guaranteed CPU percentage.
+- Use the documented [WPF process render-mode API](https://learn.microsoft.com/en-us/dotnet/api/system.windows.media.renderoptions.processrendermode?view=windowsdesktop-10.0) only for controlled experiments; it changes the app's renderer, not global Windows settings.

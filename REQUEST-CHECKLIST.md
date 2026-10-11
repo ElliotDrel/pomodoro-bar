@@ -77,6 +77,15 @@ See [CHANGELOG.md](CHANGELOG.md) for dated Dev/Prod changes between versions. Th
 - [ ] Publish through semver tags and GitHub Actions native tests, self-contained build, smoke test, Velopack packaging, and public upload.
 - [ ] Retain the three completed Opus 5.5 adversarial reviews from the port/updater work; this UI pass used regression tests and visual critique without adding further review runs.
 
+## Resource optimization
+
+- [ ] Confirm paused bars do not redraw continuously and paused end estimates still update at rounded-minute boundaries.
+- [ ] Confirm running visible countdowns/colors update each second, while reminder/completion flashes still animate.
+- [ ] Hide/minimize both windows and confirm reminders/completion continue without routine UI work; reopen and confirm the countdown catches up.
+- [ ] Resume Windows or change the system clock and confirm the engine/preview recover correctly.
+- [ ] Confirm the native tray icon, right-click actions, keyboard activation, update actions, and reopening both windows.
+- [ ] Compare the measured results in `RESOURCE-AUDIT.md`; retain WPF as selected before considering a full native UI rewrite.
+
 ## Proposed next change: separate Focus and Break inputs
 
 - Present two editable durations together: **Focus `25 min`** and **Break `5 min`**.

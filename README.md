@@ -6,6 +6,8 @@ See the [version/channel changelog](CHANGELOG.md) for changes between releases a
 
 The editor shows the current focus or break section's estimated end time beneath the countdown. It updates immediately while typing, rounds the resulting clock time to the nearest minute, and labels next-day dates. Paused timers estimate an end if started now; an unsaved running draft estimates an end if saved now. Enter still saves the duration and Escape cancels it.
 
+The timer refreshes visible countdowns once per displayed second and animates only during alerts. Paused bars stay still; the editor's start-now end estimate updates at its next rounded-minute boundary. Hidden/minimized windows receive no routine UI refresh, and when both are hidden the engine waits for the next reminder or completion. Reopening or resuming Windows catches the timer up immediately. The tray uses Windows shell interop rather than loading WinForms. See the [resource audit](RESOURCE-AUDIT.md) for measured results and limitations.
+
 Record every change under **Unreleased** before committing. Dev gets those changes when `main` is pulled and rebuilt. When releasing Prod, move the shipped notes into a dated version entry and keep the historical entries. Main/PR checks require a changelog update alongside other changed files; release CI requires the matching version entry and publishes its notes on GitHub. Validate locally with `scripts/changelog.ps1` and `tests/Changelog.Tests.ps1`.
 
 ## Install
@@ -76,6 +78,10 @@ git diff --check
 ```
 
 `scripts/dev.ps1` starts Dev. Dev and Prod run side by side with separate instance locks, IPC, settings, titles, and tray labels. Dev uses the same logo on a yellow icon background in the executable, windows, and tray. Dev never auto-updates and rejects update/restart commands; pull, rebuild, and relaunch manually. Tests exercise real WPF windows with silent fake audio plus the engine, parser, colors, layout, migration, and updater with fake packages/process helpers. They also activate redesigned preset/switch controls, verify the single update action through checking, downloading, ready, and retry states, and scroll the minimum-size editor. They require a Windows desktop session, never edit real settings, and never play alarms. Append `-- --capture` for ignored screenshots in `artifacts`, including normal/tiny bars and editor focus, break, completion, update-state, and small-window states.
+
+Run the silent, settings-free resource comparison harness with `dotnet run --project tests/PomodoroBar.Tests.csproj -c Release -- --resource-audit --output artifacts/resource-audit/optimized.json`. It measures seven warmed UI states, includes the real tray, disables updates/IPC, and includes its own sampling overhead. It creates disposable test windows; do not overlap benchmarks with builds. Retain the raw readings when comparing versions.
+
+Use `--scenario "bar only"` to measure one state with scheduler/render counts and per-thread CPU; append `--software` only to experiment with software rendering. Normal app rendering stays unchanged because the software experiment traded lower RAM for higher CPU on the tested machine.
 
 ## Releases
 

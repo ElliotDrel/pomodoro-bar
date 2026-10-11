@@ -22,6 +22,14 @@ internal sealed class EditorWindow : Window
     internal readonly Button UpdateButton;
     private bool updateReady;
     private bool editing, dirty, syncing;
+    private double? draftSeconds;
+    private double cachedFocus = double.NaN, cachedRest = double.NaN;
+    private int displayedSecond = -1;
+    private Rgb? displayedColor;
+    private DateTimeOffset? displayedEnd;
+    private DateTime displayedToday;
+    private string? displayedEndPrefix;
+    internal int SyncCount { get; private set; }
     internal bool Editing => editing;
     public EditorWindow(AppHost host)
     {
@@ -80,7 +88,11 @@ internal sealed class EditorWindow : Window
         ShowBar.Click += (_,_) => { if (ShowBar.IsChecked == true) host.Bar.Show(); else host.Bar.Hide(); };
         panel.Children.Add(ShowBar);
         ResizeBar = UiTheme.Switch("Resize using the bar’s edges");
-        ResizeBar.Click += (_,_) => { if (ResizeBar.IsChecked == true) host.Bar.Show(); host.Bar.SetResize(ResizeBar.IsChecked == true); host.Render(); }; panel.Children.Add(ResizeBar);
+        ResizeBar.Click += (_,_) => {
+            bool resize = ResizeBar.IsChecked == true;
+            // Showing the bar synchronizes controls; capture the requested value first.
+            if (resize) host.Bar.Show(); host.Bar.SetResize(resize); host.Render();
+        }; panel.Children.Add(ResizeBar);
         var updateRow = new DockPanel { Margin = new Thickness(0,20,0,0) };
         updateAction = UiTheme.Text("Check for updates",12,true); updateAction.TextAlignment = TextAlignment.Center; updateAction.MaxWidth = 142;
         UpdateButton = UiTheme.Button(updateAction,UpdateClicked);
@@ -90,7 +102,13 @@ internal sealed class EditorWindow : Window
         update.VerticalAlignment = VerticalAlignment.Center; updateRow.Children.Add(update); panel.Children.Add(updateRow);
         note = UiTheme.Text("Set your time, then press play on the bar.",12,ink:UiTheme.Muted); note.Margin = new Thickness(0,14,0,8); panel.Children.Add(note);
         TimeCard.GotKeyboardFocus += (_,_) => { editing = true; dirty = false; };
-        TimeCard.TextChanged += (_,_) => { if (editing && !syncing) dirty = true; SyncEndTime(); };
+        TimeCard.TextChanged += (_,_) => {
+            if (editing && !syncing) {
+                dirty = true;
+                try { draftSeconds = TimerModel.ParseTime(TimeCard.Text); } catch (ArgumentException) { draftSeconds = null; }
+                SyncEndTime(); host.ScheduleWake();
+            }
+        };
         TimeCard.LostKeyboardFocus += (_,_) => { if (!FinishEdit()) CancelEdit(); };
         TimeCard.PreviewKeyDown += (_,e) => {
             if (e.Key == Key.Enter) { if (FinishEdit()) Keyboard.ClearFocus(); e.Handled = true; }
@@ -108,7 +126,7 @@ internal sealed class EditorWindow : Window
         var b = UiTheme.Button(content,action); b.HorizontalContentAlignment = HorizontalAlignment.Left;
         AutomationProperties.SetName(b,$"{total} minutes: {focus} focus, {rest} break"); return b;
     }
-    internal void CancelEdit() { editing = false; dirty = false; Sync(); }
+    internal void CancelEdit() { editing = false; dirty = false; displayedSecond = -1; Sync(); host.ScheduleWake(); }
     internal bool FinishEdit()
     {
         if (!editing) return true;
@@ -116,22 +134,30 @@ internal sealed class EditorWindow : Window
             try { host.SetTime(TimerModel.ParseTime(TimeCard.Text)); }
             catch (ArgumentException ex) { Note(ex.Message); return false; }
         }
-        editing = false; dirty = false; Sync(); return true;
+        editing = false; dirty = false; displayedSecond = -1; Sync(); host.ScheduleWake(); return true;
     }
     internal void Sync()
     {
+        SyncCount++;
         var t = host.Timer;
         heading.Text = t.IsFocus ? "Focus time" : "Break time";
         heading.Foreground = t.IsFocus ? UiTheme.Focus : UiTheme.Rest;
-        if (!editing) { syncing = true; TimeCard.Text = TimerModel.FormatTime(t.Remaining); syncing = false; }
+        int second = (int)Math.Ceiling(t.Remaining);
+        if (!editing && displayedSecond != second) { syncing = true; TimeCard.Text = TimerModel.FormatTime(t.Remaining); syncing = false; displayedSecond = second; }
         var color = VisualMath.CountdownColor(t.Remaining/t.Duration);
-        TimeCard.Foreground = new SolidColorBrush(Color.FromRgb(color.R,color.G,color.B));
-        session.Text = $"{(t.Focus+t.Rest)/60:0.##} min total";
-        focusLength.Text = TimerModel.FormatTime(t.Focus) + " focus";
-        breakLength.Text = TimerModel.FormatTime(t.Rest) + " break";
+        if (displayedColor != color) {
+            var brush = new SolidColorBrush(Color.FromRgb(color.R,color.G,color.B)); brush.Freeze();
+            TimeCard.Foreground = brush; displayedColor = color;
+        }
+        if (cachedFocus != t.Focus || cachedRest != t.Rest) {
+            session.Text = $"{(t.Focus+t.Rest)/60:0.##} min total";
+            focusLength.Text = TimerModel.FormatTime(t.Focus) + " focus";
+            breakLength.Text = TimerModel.FormatTime(t.Rest) + " break";
+            cachedFocus = t.Focus; cachedRest = t.Rest;
+        }
         cycle.Set(t.Focus/(t.Focus+t.Rest),t.Progress);
         status.Text = t.Waiting ? "Time is up" : t.Running ? "Running" : "Paused";
-        status.Foreground = t.Waiting ? UiTheme.Color("#FFAE66") : UiTheme.Muted;
+        status.Foreground = t.Waiting ? UiTheme.Warning : UiTheme.Muted;
         AlarmButton.Visibility = t.Waiting ? Visibility.Visible : Visibility.Collapsed;
         ShowBar.IsChecked = host.Bar.IsVisible; ResizeBar.IsChecked = host.Bar.ResizeEnabled;
         SyncEndTime();
@@ -142,16 +168,26 @@ internal sealed class EditorWindow : Window
         double remaining = t.Remaining;
         bool preview = editing && dirty;
         if (preview) {
-            try { remaining = TimerModel.ParseTime(TimeCard.Text); }
-            catch (ArgumentException) { EndTime.Text = "Enter a valid time to preview the end."; return; }
-        } else if (t.Waiting) { EndTime.Text = t.IsFocus ? "Focus complete" : "Break complete"; return; }
+            if (draftSeconds is not double value) { displayedEnd = null; EndTime.Text = "Enter a valid time to preview the end."; return; }
+            remaining = value;
+        } else if (t.Waiting) { displayedEnd = null; EndTime.Text = t.IsFocus ? "Focus complete" : "Break complete"; return; }
         var now = host.Now;
         var end = TimerModel.EstimatedEnd(now,remaining).ToLocalTime();
+        string prefix = !t.Running ? "If started now · ends at " : preview ? "If saved now · ends at " : "Ends at ";
         var today = now.LocalDateTime.Date;
+        if (displayedEnd == end && displayedEndPrefix == prefix && displayedToday == today) return;
+        displayedEnd = end; displayedEndPrefix = prefix; displayedToday = today;
         string day = end.Date == today ? "" : end.Date == today.AddDays(1) ? " tomorrow" : end.ToString(" 'on' ddd, MMM d");
         string when = end.ToString("t") + day;
-        EndTime.Text = !t.Running ? "If started now · ends at " + when
-            : preview ? "If saved now · ends at " + when : "Ends at " + when;
+        EndTime.Text = prefix + when;
+    }
+    internal double SecondsUntilPreviewChange()
+    {
+        var t = host.Timer;
+        bool preview = editing && dirty;
+        if ((t.Running && !preview) || (t.Waiting && !preview) || (preview && draftSeconds is null)) return double.PositiveInfinity;
+        double seconds = (host.Now.AddSeconds(preview ? draftSeconds!.Value : t.Remaining).Ticks % TimeSpan.TicksPerMinute) / (double)TimeSpan.TicksPerSecond;
+        return seconds < 30 ? 30 - seconds : 90 - seconds;
     }
     internal void Note(string text) => note.Text = text;
     private void UpdateClicked()
@@ -181,6 +217,7 @@ internal sealed class EditorWindow : Window
 
 internal sealed class CycleStrip : FrameworkElement
 {
+    private static readonly Pen TickPen = UiTheme.Pen(UiTheme.Line,1), ProgressPen = UiTheme.Pen(UiTheme.Ink,2);
     private double focus = 5d/6, progress;
     internal void Set(double focusFraction,double elapsed)
     {
@@ -194,10 +231,10 @@ internal sealed class CycleStrip : FrameworkElement
         dc.DrawRectangle(UiTheme.Rest,null,new Rect(split,14,width-split,4));
         for (int i = 0; i <= 12; i++) {
             double x = Math.Clamp(width*i/12,1,Math.Max(1,width-1));
-            dc.DrawLine(new Pen(UiTheme.Line,1),new Point(x,20),new Point(x,i%3==0 ? 27 : 24));
+            dc.DrawLine(TickPen,new Point(x,20),new Point(x,i%3==0 ? 27 : 24));
         }
         double position = Math.Clamp(width*progress,1,Math.Max(1,width-1));
-        dc.DrawLine(new Pen(UiTheme.Ink,2),new Point(position,5),new Point(position,20));
+        dc.DrawLine(ProgressPen,new Point(position,5),new Point(position,20));
         dc.DrawEllipse(UiTheme.Ink,null,new Point(position,5),2,2);
     }
 }

@@ -21,6 +21,18 @@ public sealed class TimerModel
     public double Progress => Math.Clamp(((IsFocus ? 0 : Focus) + Duration - Remaining) / (Focus + Rest), 0, 1);
     public int FiredCount => fired.Count;
 
+    // Schedule only the next unfired milestone. Deadlines remain authoritative after sleep.
+    public double SecondsUntilNextEvent()
+    {
+        if (!Running) return double.PositiveInfinity;
+        double remaining = Math.Max(0, deadline - clock());
+        double delay = remaining;
+        if (IsFocus)
+            foreach (double p in Thresholds)
+                if (!fired.Contains(p)) delay = Math.Min(delay, Math.Max(0, remaining - Focus * p / 100));
+        return delay;
+    }
+
     public TimerModel(double focus, double rest, double[] thresholds, Func<double> clock)
     {
         ValidateDuration(focus); ValidateDuration(rest);

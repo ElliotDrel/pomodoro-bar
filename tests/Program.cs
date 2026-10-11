@@ -19,6 +19,9 @@ internal static class Tests
 {
     [DllImport("user32.dll", CharSet=CharSet.Unicode)]
     private static extern IntPtr SendMessage(IntPtr window,uint message,IntPtr wParam,IntPtr lParam);
+    [DllImport("user32.dll",EntryPoint="RegisterWindowMessageW",CharSet=CharSet.Unicode)]
+    private static extern uint RegisterWindowMessage(string name);
+    [DllImport("user32.dll")] private static extern IntPtr GetShellWindow();
     private static int count;
     private static void Check(bool value,string reason) { if (!value) throw new Exception(reason); count++; }
     private static void Near(double a,double b,string reason) => Check(Math.Abs(a-b)<.001,reason);
@@ -26,13 +29,18 @@ internal static class Tests
     [STAThread]
     private static int Main(string[] args)
     {
+        if (args.Contains("--resource-audit")) return ResourceAudit.Run(args);
         try {
             double now = 0;
             var t = new TimerModel(1500,300,[40,20],()=>now);
-            Check(!t.Running && t.IsFocus,"starts paused focus"); t.Toggle();
+            Check(!t.Running && t.IsFocus,"starts paused focus");
+            Check(double.IsPositiveInfinity(t.SecondsUntilNextEvent()),"paused engine needs no polling"); t.Toggle();
+            Near(t.SecondsUntilNextEvent(),900,"schedule first focus milestone directly");
             now = 900; Check(t.Tick()=="second-last","30-minute first reminder at 10 left");
+            Near(t.SecondsUntilNextEvent(),300,"schedule next unfired milestone");
             now = 1200; Check(t.Tick()=="last","last reminder at 5 left");
             now = 1500; Check(t.Tick()=="complete" && t.Waiting && !t.Running,"completion blocks");
+            Check(double.IsPositiveInfinity(t.SecondsUntilNextEvent()),"acknowledgement waiting needs no engine polling");
             now = 2000; Check(t.Tick() is null && t.IsFocus,"completion waits for acknowledgement");
             t.Toggle(); Check(!t.IsFocus && t.Running && t.Remaining == 300,"ack starts break");
             Near(t.Progress,5d/6,"total cycle progress");
@@ -115,12 +123,51 @@ internal static class Tests
         var wallStart=DateTimeOffset.Now.Date.AddHours(14);
         using var host=new AppHost(new Settings(),Path.Combine(scratch,"gui.json"),audio,()=>now,services:false,wallClock:()=>new DateTimeOffset(wallStart).AddSeconds(now));
         Pump();
+        int trayOpens = 0;
+        using (var tray = new NativeTray(() => trayOpens++)) {
+            Check(tray.Registered || GetShellWindow()==IntPtr.Zero,"native tray registers or safely defers when CI has no desktop shell");
+            SendMessage(tray.Handle,0x8001,new IntPtr(1),new IntPtr(0x203));
+            SendMessage(tray.Handle,0x8001,IntPtr.Zero,new IntPtr(0x10000 | 0x401));
+            Check(trayOpens==2,"native tray handles legacy double-click and version-four keyboard activation");
+            SendMessage(tray.Handle,RegisterWindowMessage("TaskbarCreated"),IntPtr.Zero,IntPtr.Zero);
+            Check(tray.Registered || GetShellWindow()==IntPtr.Zero,"native tray re-registers or safely defers after shell recreation");
+            tray.Dispose();Check(!tray.Registered,"native tray releases shell registration");
+        }
+        Check(MonitorAreas.WorkingAreas().Count>0,"native monitor work areas available without WinForms");
+        Check(!AppDomain.CurrentDomain.GetAssemblies().Any(a=>a.GetName().Name=="System.Windows.Forms"),"native windows and tray do not load a second UI framework");
         Check(host.Bar.IsVisible && host.Editor.IsVisible,"startup opens both windows by default");
         Check(host.Editor.EndTime.Text=="If started now · ends at "+wallStart.AddMinutes(25).ToString("t"),"paused editor previews focus end if started now");
+        Check(host.CanAutoRestart,"default editor visibility does not count as user interaction");
+        Near(host.WakeInterval.TotalSeconds,30,"paused visible editor schedules rounded end-preview boundary");
+        Check(!host.AnimationScheduled,"paused bar does not animate");
+        int renders=host.Bar.Surface.RenderCount;
+        host.Render();Pump();host.Render();Pump();
+        Check(host.Bar.Surface.RenderCount==renders,"unchanged paused state does not redraw the bar");
+        host.Bar.Hide();host.Editor.Hide();
+        Check(!host.WakeScheduled,"paused hidden app has no recurring wakeups");
+        int syncs=host.Editor.SyncCount;now=65;host.Tick();
+        Check(host.Editor.SyncCount==syncs,"hidden editor does not receive timer sync");
+        host.ShowApp();now=0;host.Reset();Pump();
+        host.Toggle();host.Bar.Hide();host.Editor.Hide();
+        Near(host.WakeInterval.TotalSeconds,900,"hidden running app waits for next reminder instead of display polling");
+        now=905;host.Tick();
+        Check(audio.Last=="second-last" && !host.AnimationScheduled,"hidden delayed reminder sounds without animating hidden windows");
+        Near(host.WakeInterval.TotalSeconds,295,"hidden reminder reschedules following milestone");
+        host.ShowApp();
+        Check(host.Editor.TimeCard.Text=="09:55" && host.WakeInterval.TotalSeconds<=1,"reopening catches up visible countdown and resumes second updates");
+        now=1500;host.Tick();host.Bar.Hide();host.Editor.Hide();
+        Check(audio.Loop && !host.WakeScheduled && !host.AnimationScheduled,"hidden completion loops audio without UI polling");
+        host.ShowApp();
+        Check(host.Editor.AlarmButton.Visibility==Visibility.Visible,"reopened completion remains acknowledgeable");
+        now=0;host.Reset();Pump();
         wallStart=wallStart.Date.AddHours(23).AddMinutes(50);host.Render();
         Check(host.Editor.EndTime.Text=="If started now · ends at "+wallStart.Date.AddDays(1).AddMinutes(15).ToString("t")+" tomorrow","editor labels next-day end times");
+        host.SetTime(1200);host.Toggle();host.Tick();
+        Check(host.Editor.EndTime.Text.EndsWith(" tomorrow"),"running cross-midnight end starts with tomorrow label");
+        now=600;host.Tick();
+        Check(host.Editor.EndTime.Text=="Ends at "+wallStart.Date.AddDays(1).AddMinutes(10).ToString("t"),"cached running end label changes when midnight passes");
+        now=0;host.SetSession(30,[40,20]);
         wallStart=wallStart.Date.AddHours(14);host.Render();
-        Check(host.CanAutoRestart,"default editor visibility does not count as user interaction");
         host.OpenEditor(); Pump();
         double width=host.Bar.Width,height=host.Bar.Height;
         Check(host.Bar.Topmost && host.Bar.WindowStyle==WindowStyle.None,"native always-on-top borderless window");

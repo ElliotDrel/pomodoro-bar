@@ -44,8 +44,7 @@ internal sealed class BarWindow : Window
         var source = PresentationSource.FromVisual(this);
         var fromDevice = source?.CompositionTarget?.TransformFromDevice ?? Matrix.Identity;
         var current = new Rect(Left, Top, Width, Height);
-        foreach (var screen in System.Windows.Forms.Screen.AllScreens) {
-            var bounds = screen.WorkingArea;
+        foreach (var bounds in MonitorAreas.WorkingAreas()) {
             var r = new Rect(fromDevice.Transform(new Point(bounds.Left, bounds.Top)), fromDevice.Transform(new Point(bounds.Right, bounds.Bottom)));
             var visible = Rect.Intersect(r, current);
             if (!visible.IsEmpty && visible.Width >= 40 && visible.Height >= 20) return;
@@ -76,6 +75,26 @@ internal sealed class BarSurface : FrameworkElement
     internal BarLayout Layout => layout;
     internal static SolidColorBrush Brush(string hex) => new((Color)ColorConverter.ConvertFromString(hex));
     private static readonly Typeface Typeface = new(UiTheme.Digits, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+    private static readonly Pen BorderPen = UiTheme.Pen(UiTheme.Line,1), ResizePen = UiTheme.Pen(UiTheme.Focus,1),
+        RingPen = UiTheme.Pen(UiTheme.Line,3), FocusPen = UiTheme.Pen(UiTheme.Focus,3), RestPen = UiTheme.Pen(UiTheme.Rest,3),
+        HoverPen = UiTheme.Pen(UiTheme.Ink,1), PlayPen = UiTheme.Pen(UiTheme.Background,2,true),
+        GlyphPen = UiTheme.Pen(UiTheme.Ink,2,true), PencilPen = UiTheme.Pen(UiTheme.Ink,5);
+    private FormattedText? cachedText, cachedBang;
+    private int cachedSecond = -1;
+    private double cachedDpi, cachedWidth = -1, cachedHeight = -1, cachedTextWidth = -1, cachedProgress = -1;
+    private Rgb? cachedColor;
+    private StreamGeometry? cachedArc, playTriangle, skipTriangle;
+    private MatrixTransform? layoutTransform;
+    private readonly SolidColorBrush pulseBrush = new();
+    private (double Remaining, double Progress, bool Focus, bool Running, bool Waiting, bool Pulse, bool Resize)? displayed;
+    internal int RenderCount { get; private set; }
+    internal void Refresh()
+    {
+        var t = host.Timer;
+        var state = (t.Remaining,t.Progress,t.IsFocus,t.Running,t.Waiting,host.Pulsing,host.Bar.ResizeEnabled);
+        if (displayed == state) return;
+        displayed = state; InvalidateVisual();
+    }
     public BarSurface(AppHost host)
     {
         this.host = host;
@@ -89,33 +108,54 @@ internal sealed class BarSurface : FrameworkElement
     }
     protected override void OnRender(DrawingContext dc)
     {
+        RenderCount++;
         var timer = host.Timer;
         double pulse = host.Pulsing ? (SystemParameters.ClientAreaAnimation ? .5 + .5 * Math.Sin(Environment.TickCount64 * Math.PI / 500d) : .6) * .55 : 0;
         byte Blend(byte a, byte b) => (byte)Math.Round(a+(b-a)*pulse);
         dc.DrawRectangle(UiTheme.Background,null,new Rect(RenderSize));
-        dc.DrawRoundedRectangle(new SolidColorBrush(Color.FromRgb(Blend(41,255),Blend(54,188),Blend(64,112))),
-            new Pen(host.Bar.ResizeEnabled ? UiTheme.Focus : UiTheme.Line,1),new Rect(.5,.5,Math.Max(0,ActualWidth-1),Math.Max(0,ActualHeight-1)),8,8);
+        pulseBrush.Color = Color.FromRgb(Blend(41,255),Blend(54,188),Blend(64,112));
+        dc.DrawRoundedRectangle(pulse == 0 ? UiTheme.Surface : pulseBrush,
+            host.Bar.ResizeEnabled ? ResizePen : BorderPen,new Rect(.5,.5,Math.Max(0,ActualWidth-1),Math.Max(0,ActualHeight-1)),8,8);
         var rgb = VisualMath.CountdownColor(timer.Remaining / timer.Duration);
-        var text = new FormattedText(TimerModel.FormatTime(timer.Remaining), CultureInfo.InvariantCulture, FlowDirection.LeftToRight, Typeface, 28,
-            new SolidColorBrush(Color.FromRgb(rgb.R, rgb.G, rgb.B)), VisualTreeHelper.GetDpi(this).PixelsPerDip);
-        layout = BarLayout.Fit(ActualWidth, ActualHeight, text.Width + 6);
-        dc.PushTransform(new TranslateTransform(layout.Left, layout.Top));
-        dc.PushTransform(new ScaleTransform(layout.Scale, layout.Scale));
+        int second = (int)Math.Ceiling(timer.Remaining);
+        double dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        if (cachedText is null || cachedSecond != second || cachedDpi != dpi) {
+            cachedText = new FormattedText(TimerModel.FormatTime(timer.Remaining), CultureInfo.InvariantCulture, FlowDirection.LeftToRight, Typeface, 28,UiTheme.Ink,dpi);
+            cachedSecond = second; cachedDpi = dpi; cachedColor = null; cachedBang = null;
+        }
+        if (cachedColor != rgb) {
+            var brush = new SolidColorBrush(Color.FromRgb(rgb.R,rgb.G,rgb.B)); brush.Freeze();
+            cachedText.SetForegroundBrush(brush); cachedColor = rgb;
+        }
+        var text = cachedText;
+        if (cachedWidth != ActualWidth || cachedHeight != ActualHeight || cachedTextWidth != text.Width) {
+            layout = BarLayout.Fit(ActualWidth,ActualHeight,text.Width+6);
+            layoutTransform = new MatrixTransform(new Matrix(layout.Scale,0,0,layout.Scale,layout.Left,layout.Top)); layoutTransform.Freeze();
+            cachedWidth = ActualWidth; cachedHeight = ActualHeight; cachedTextWidth = text.Width;
+            double offset = 40+layout.TimerWidth;
+            playTriangle = Triangle(new Point(offset+12,18),new Point(offset+12,34),new Point(offset+23,26));
+            skipTriangle = Triangle(new Point(offset+42,19),new Point(offset+42,33),new Point(offset+52,26));
+        }
+        dc.PushTransform(layoutTransform!);
         var phase = timer.IsFocus ? UiTheme.Focus : UiTheme.Rest;
-        var pen = new Pen(phase, 3);
-        dc.DrawEllipse(null, new Pen(UiTheme.Line, 3), new Point(22,26), 12,12);
+        var pen = timer.IsFocus ? FocusPen : RestPen;
+        dc.DrawEllipse(null, RingPen, new Point(22,26), 12,12);
         if (timer.Progress >= .9999) dc.DrawEllipse(null, pen, new Point(22,26),12,12);
         else if (timer.Progress > .0001) {
-            double angle = timer.Progress * Math.PI * 2;
-            var geometry = new StreamGeometry();
-            using (var ctx = geometry.Open()) {
-                ctx.BeginFigure(new Point(22,14), false, false);
-                ctx.ArcTo(new Point(22 + 12 * Math.Sin(angle), 26 - 12 * Math.Cos(angle)), new Size(12,12), 0, angle > Math.PI, SweepDirection.Clockwise, true, false);
+            if (cachedArc is null || cachedProgress != timer.Progress) {
+                double angle = timer.Progress * Math.PI * 2;
+                cachedArc = new StreamGeometry();
+                using (var ctx = cachedArc.Open()) {
+                    ctx.BeginFigure(new Point(22,14), false, false);
+                    ctx.ArcTo(new Point(22 + 12 * Math.Sin(angle), 26 - 12 * Math.Cos(angle)), new Size(12,12), 0, angle > Math.PI, SweepDirection.Clockwise, true, false);
+                }
+                cachedArc.Freeze(); cachedProgress = timer.Progress;
             }
-            dc.DrawGeometry(null, pen, geometry);
+            dc.DrawGeometry(null, pen, cachedArc);
         }
         if (timer.Waiting) {
-            var bang = new FormattedText("!", CultureInfo.InvariantCulture, FlowDirection.LeftToRight, Typeface, 19, phase, VisualTreeHelper.GetDpi(this).PixelsPerDip);
+            var bang = cachedBang ??= new FormattedText("!", CultureInfo.InvariantCulture, FlowDirection.LeftToRight, Typeface, 19, phase,dpi);
+            bang.SetForegroundBrush(phase);
             dc.DrawText(bang, new Point(22 - bang.Width/2, 14));
         } else dc.DrawEllipse(phase,null,new Point(22,26),2,2);
         dc.DrawText(text, new Point(40, (52-text.Height)/2));
@@ -124,25 +164,25 @@ internal sealed class BarSurface : FrameworkElement
             var fill = i == 0 ? phase : hovered == i+2 ? UiTheme.Line : UiTheme.Surface;
             dc.DrawRoundedRectangle(fill,null,new Rect(x+i*32+3,10,27,32),6,6);
         }
-        if (hovered == 0) dc.DrawEllipse(null,new Pen(UiTheme.Ink,1),new Point(22,26),16,16);
-        var playGlyph = new Pen(UiTheme.Background,2) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
-        var glyph = new Pen(UiTheme.Ink, 2) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
+        if (hovered == 0) dc.DrawEllipse(null,HoverPen,new Point(22,26),16,16);
+        var playGlyph = PlayPen;
+        var glyph = GlyphPen;
         if (timer.Running) {
             dc.DrawLine(playGlyph, new Point(x+12,19), new Point(x+12,33)); dc.DrawLine(playGlyph,new Point(x+20,19),new Point(x+20,33));
-        } else Triangle(dc, new Point(x+12,18), new Point(x+12,34), new Point(x+23,26), playGlyph.Brush);
+        } else dc.DrawGeometry(playGlyph.Brush,null,playTriangle);
         x += 32;
-        Triangle(dc, new Point(x+10,19), new Point(x+10,33), new Point(x+20,26), glyph.Brush);
+        dc.DrawGeometry(glyph.Brush,null,skipTriangle);
         dc.DrawLine(glyph,new Point(x+23,19),new Point(x+23,33));
         x += 32;
         dc.DrawLine(glyph,new Point(x+11,32),new Point(x+23,20));
-        dc.DrawLine(new Pen(glyph.Brush,5),new Point(x+12,31),new Point(x+22,21));
+        dc.DrawLine(PencilPen,new Point(x+12,31),new Point(x+22,21));
         dc.DrawLine(glyph,new Point(x+9,35),new Point(x+14,34));
-        dc.Pop(); dc.Pop();
+        dc.Pop();
     }
-    private static void Triangle(DrawingContext dc, Point a, Point b, Point c, Brush brush)
+    private static StreamGeometry Triangle(Point a, Point b, Point c)
     {
         var g = new StreamGeometry(); using (var ctx = g.Open()) { ctx.BeginFigure(a,true,true); ctx.LineTo(b,true,false); ctx.LineTo(c,true,false); }
-        dc.DrawGeometry(brush,null,g);
+        g.Freeze(); return g;
     }
     private void Press(object sender, MouseButtonEventArgs e)
     {

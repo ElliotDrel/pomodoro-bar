@@ -2,7 +2,7 @@
 
 ## Project
 
-Native C#/.NET 10 Windows app: WPF windows, WinForms tray, Velopack installer/updater. This supersedes Python/Tkinter. Keep the floating bar separate from the editor. Release installers bundle .NET.
+Native C#/.NET 10 Windows app: WPF windows, direct Windows shell tray, Velopack installer/updater. This supersedes Python/Tkinter. Keep the floating bar separate from the editor. Release installers bundle .NET.
 
 ## Preserve
 
@@ -14,6 +14,7 @@ Native C#/.NET 10 Windows app: WPF windows, WinForms tray, Velopack installer/up
 - Presets: 30 total = 25/5; 60 total = 50/10. Additions preserve 5:1 ratio and reminder percentages.
 - Assign sounds backward; completion loops until a bar interaction silences audio. Completion waits for acknowledgement; coalesce delayed reminders.
 - Audio/update work must not block the dispatcher.
+- Schedule visible countdown seconds and hidden milestones directly; do not reintroduce unconditional polling. Keep paused rounded end previews live, skip hidden/minimized UI, and animate alerts only on the visible bar. Catch up on resume/time changes and preserve drafts.
 - Channel identity, paths, locks, IPC belong in `BuildChannel.cs`. Dev never auto-updates.
 - Settings live in channel-specific LocalAppData outside the installer-owned root; preserve them on updates.
 - One update flow: `UpdateService.CheckAsync`; launch applies, periodic stages.
@@ -27,7 +28,9 @@ Native C#/.NET 10 Windows app: WPF windows, WinForms tray, Velopack installer/up
 | src/BarWindow.cs | Floating drawing, hit targets, moving, native resizing |
 | src/EditorWindow.cs | Independent editor, protected time draft, live rounded end-time preview, and focus/break timeline |
 | src/UiTheme.cs | Shared palette, keyboard-focus button/switch templates, and menu styling |
-| src/AppIcon.cs | Shared embedded icon for both native windows and their taskbar entries |
+| src/AppIcon.cs | Shared embedded window/taskbar icon and owned native tray icon handles |
+| src/NativeTray.cs | Windows shell tray registration, native menus, keyboard activation, Explorer recovery and icon cleanup |
+| src/MonitorAreas.cs | Native monitor work areas without loading WinForms |
 | src/AppHost.cs | Controller, alerts, tray, lifecycle and settings |
 | src/Program.cs | Entry point, Velopack, singleton, migration, smoke mode |
 | src/BuildChannel.cs, src/Log.cs | Channel identity, paths and diagnostics |
@@ -37,6 +40,7 @@ Native C#/.NET 10 Windows app: WPF windows, WinForms tray, Velopack installer/up
 | src/Audio.cs, sounds/ | Async Windows playback and bundled WAV chimes |
 | tests/ | Native engine, GUI, layout, migration and audio regression harness |
 | tests/UpdateFlowTests.cs | Fake-package updater regressions and a harmless real console-window suppression probe |
+| tests/ResourceAudit.cs | Silent settings-free warmed CPU/RAM/allocation measurements in seven UI states |
 | assets/ | Prod app icon and yellow-background Dev variant |
 | scripts/dev.ps1 | Dev run helper |
 | scripts/install-prod.ps1, scripts/verify-installation.ps1 | Unpackaged installation and physical-path/shortcut verification |
