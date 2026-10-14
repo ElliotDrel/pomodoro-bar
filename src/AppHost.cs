@@ -177,6 +177,7 @@ internal sealed class AppHost : IDisposable
     internal System.Windows.Media.SolidColorBrush CountdownBrush {
         get {
             if (Timer.Scheduled) return UiTheme.Scheduled;
+            if (!Timer.IsFocus) return Timer.Waiting ? UiTheme.Complete : UiTheme.Rest;
             var color = VisualMath.CountdownColor(Timer.Remaining/Timer.Duration);
             if (displayedCountdownColor != color) {
                 displayedCountdownBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(color.R,color.G,color.B));

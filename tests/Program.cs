@@ -196,6 +196,10 @@ internal static class Tests
         Check(host.Bar.ShowInTaskbar && host.Editor.ShowInTaskbar,"showing bar preserves both taskbar windows");
         host.Silence(); Check(audio.Last is null && host.Timer.Waiting,"interaction silences without automatically advancing");
         host.Skip(); Check(!host.Timer.IsFocus && host.Timer.Running,"skip acknowledgement");
+        now+=299;host.Tick();Check(host.CountdownBrush==UiTheme.Rest && host.Editor.BreakCard.Foreground==UiTheme.Rest,"break countdown stays green until its final second");
+        now+=1;host.Tick();Check(host.Timer.Waiting && host.CountdownBrush==UiTheme.Complete,"break countdown turns red only at completion");
+        Check(host.Editor.TimerPanel.ProgressColor==UiTheme.Complete,"completed break outline uses the same red");
+        host.SetTime(300);host.Toggle();
         host.Bar.Hide();host.Render();Check(host.Timer.Running && host.Editor.IsVisible && host.Editor.ShowBar.IsChecked==false,"hidden bar independent of editor and clock");
         host.Bar.Show();host.Bar.SetResize(true);Check(host.Bar.ResizeMode==ResizeMode.CanResize,"native resize enabled");
         host.Bar.Width=130;host.Bar.Height=20;Pump();host.Render();Pump();
@@ -229,7 +233,7 @@ internal static class Tests
         Check(host.Editor.TimeCard.Text=="25:00" && host.Editor.FocusEndCard.Text=="2:35 PM" && host.Editor.BreakEndCard.Text=="2:40 PM","scheduled editor shows durations and both planned endpoints");
         Check(host.Editor.StartCountdown.FontSize>=24 && host.Editor.StartCountdown.Visibility==Visibility.Visible,"scheduled countdown is at least twice the old label size");
         Check(host.Editor.TimerPanel.ProgressColor==host.CountdownBrush && host.Editor.TimeCard.Foreground==host.CountdownBrush,"editor countdown and progress border share scheduled color");
-        Check(UiTheme.CountdownTimeline.GradientStops.Count==6,"timeline includes complete countdown color ramp");
+        Check(UiTheme.FocusTimelineBands.Length==5 && UiTheme.FocusTimelineBands.All(b=>b.Color is SolidColorBrush),"focus timeline has five distinct solid color blocks");
         host.Editor.CancelEdit(); host.Bar.Hide();host.Editor.Hide();
         Near(host.WakeInterval.TotalSeconds,600,"hidden scheduled timer sleeps until start deadline");
         now=605;host.Tick(); Check(host.Timer.Running && !host.Timer.Scheduled,"late wake starts scheduled focus");

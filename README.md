@@ -27,8 +27,8 @@ Production uses Velopack, matching Universal Spell Check's release flow. It chec
 
 ## Floating bar
 
-- **Thick outline:** progress through the whole focus-plus-break cycle, replacing the old circle. Both the full outline and thicker completed portion use the current countdown color, including pink for a scheduled start. The editor timer panel has the same perimeter treatment.
-- **Countdown:** current section's remaining time on the left, transitioning from white through green, yellow, orange, and red. When scheduled, it shows time until focus starts in pink.
+- **Thick outline:** progress through the whole focus-plus-break cycle, replacing the old circle. The unfilled outline blends into the panel; only the thicker completed portion uses the current countdown color, including pink for a scheduled start. The editor timer panel has the same perimeter treatment.
+- **Countdown:** current section's remaining time on the left. Focus transitions from white through green, yellow, orange, and red; break stays green until completion, then turns red. When scheduled, it shows time until focus starts in pink.
 - **Play / pause:** start or pause; at completion, start the next section. Space does the same when the bar has focus. While scheduled, pause cancels the pending start.
 - **Skip:** advance, preserving running or paused state; at completion, start the next section.
 - **Pencil:** open the independent editor centered on the primary screen.
@@ -42,7 +42,7 @@ Pomodoro Bar is one app with two independent windows, each available in the task
 
 Closing one window hides it while the other stays available. Reopen the editor with the bar's pencil or by launching the app again; show the bar using **Show floating bar** in the editor. Closing the last visible window exits the app and stops audio, timers, updates, and IPC. This supersedes the earlier tray-backed behavior that kept the app running after both windows closed. **Quit** in the bar menu also exits. Minimized windows remain open in the taskbar.
 
-The editor uses a graphite instrument panel with white text, an ice-blue focus track, and a green break track. Its timeline shows each phase’s countdown color progression from white through green, yellow, orange, and red, with the focus/break boundary and current cycle position. The scheduled **Starts in** countdown is displayed at twice the old label size above pause. The redundant endpoint footer has been removed. Both large duration fields and all three timeline times are directly editable. Buttons and switches have visible keyboard focus. Scrollbars stay hidden; scroll with the mouse wheel or navigate controls with Tab when the window is small.
+The editor uses a graphite instrument panel with white text, an ice-blue focus track, and a green break track. Its timeline shows distinct focus color blocks (white, green, yellow, orange, red), with small gaps and a focus/break boundary. Break remains solid green until completion, when its text, outline progress, and timeline portion turn red. The scheduled **Starts in** countdown is displayed at twice the old label size above pause. The redundant endpoint footer has been removed. Both large duration fields and all three timeline times are directly editable. Buttons and switches have visible keyboard focus. Scrollbars stay hidden; scroll with the mouse wheel or navigate controls with Tab when the window is small.
 
 Both large duration fields are editable: focus is slightly larger, with play/pause and skip between focus and break. Enter minutes (`15`), `MM:SS` (`12:34`), or `HH:MM:SS` (`1:02:03`). Valid input applies immediately, rounded to whole minutes from one minute to 24 hours. Enter, Escape, or clicking away finishes editing; incomplete input restores the current value, while already applied valid changes remain. Running countdown updates do not overwrite the field being typed into. The active section counts down; the other field shows its configured duration.
 
@@ -63,7 +63,7 @@ One **Check for updates** button sits beside the version, status, and last-check
 
 Reminders throb for four seconds. Sounds are assigned backward: third-last is one softer beep, second-last is a rising two-note sound, last is a stronger three-note sound. The 30-minute preset uses the final two sounds; the 60-minute preset adds the single beep first. Each section's completion loops its beep and flashes at zero until acknowledged. Waiting never consumes the next section's time.
 
-Playback is asynchronous. After sleep or a delayed tick, only the most urgent crossed reminder plays; completion takes precedence. Colors interpolate per section: white at 100%, green at 80%, yellow at 40%, orange at 20%, red at 5%.
+Playback is asynchronous. After sleep or a delayed tick, only the most urgent crossed reminder plays; completion takes precedence. Focus colors interpolate: white at 100%, green at 80%, yellow at 40%, orange at 20%, red at 5%. Break stays green for its whole countdown and turns red at completion. The timeline uses discrete focus blocks rather than a gradient.
 
 ## Data and migration
 

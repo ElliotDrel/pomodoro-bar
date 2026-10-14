@@ -208,7 +208,7 @@ internal sealed class EditorWindow : Window
         TimerPanel.Set(t.Scheduled ? t.StartProgress : t.Progress,host.CountdownBrush);
         session.Text = $"{(t.Focus+t.Rest)/60:0.##} min total";
         double fraction = t.Focus/(t.Focus+t.Rest);
-        cycle.Set(fraction,t.Scheduled ? 0 : t.Progress);
+        cycle.Set(fraction,t.Scheduled ? 0 : t.Progress,!t.IsFocus && t.Waiting);
         double labelFraction = Math.Clamp(fraction,.35,.85);
         milestoneGrid.ColumnDefinitions[0].Width = new GridLength(labelFraction,GridUnitType.Star);
         milestoneGrid.ColumnDefinitions[1].Width = new GridLength(1-labelFraction,GridUnitType.Star);
@@ -264,16 +264,23 @@ internal sealed class CycleStrip : FrameworkElement
 {
     private static readonly Pen TickPen = UiTheme.Pen(UiTheme.Line,1), ProgressPen = UiTheme.Pen(UiTheme.Ink,2);
     private double focus = 5d/6, progress;
-    internal void Set(double focusFraction,double elapsed)
+    private bool breakComplete;
+    internal void Set(double focusFraction,double elapsed,bool completedBreak = false)
     {
-        if (focus == focusFraction && progress == elapsed) return;
-        focus = focusFraction; progress = elapsed; InvalidateVisual();
+        if (focus == focusFraction && progress == elapsed && breakComplete == completedBreak) return;
+        focus = focusFraction; progress = elapsed; breakComplete = completedBreak; InvalidateVisual();
     }
     protected override void OnRender(DrawingContext dc)
     {
         double width = Math.Max(0,ActualWidth), split = width*focus;
-        dc.DrawRectangle(UiTheme.CountdownTimeline,null,new Rect(0,8,split,8));
-        dc.DrawRectangle(UiTheme.CountdownTimeline,null,new Rect(split,8,width-split,8));
+        double start = 0;
+        foreach (var band in UiTheme.FocusTimelineBands) {
+            double end = split*band.End;
+            double gap = Math.Min(1,(end-start)/4);
+            dc.DrawRectangle(band.Color,null,new Rect(start,8,Math.Max(0,end-start-gap),8));
+            start = end;
+        }
+        dc.DrawRectangle(breakComplete ? UiTheme.Complete : UiTheme.Rest,null,new Rect(split,8,width-split,8));
         dc.DrawLine(TickPen,new Point(1,4),new Point(1,21));
         dc.DrawLine(TickPen,new Point(split,4),new Point(split,21));
         dc.DrawLine(TickPen,new Point(Math.Max(1,width-1),4),new Point(Math.Max(1,width-1),21));

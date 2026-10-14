@@ -5,8 +5,8 @@ See [CHANGELOG.md](CHANGELOG.md) for dated Dev/Prod changes between versions. Th
 ## Check the latest UI requests
 
 - [ ] Find the larger scheduled **Starts in** countdown directly above pause; confirm the old small countdown and redundant endpoint footer are gone.
-- [ ] See the countdown color progression across both focus and break portions of the timeline.
-- [ ] Confirm timer text, floating outline, and editor timer-panel perimeter change to the same color, with a thicker completed portion of the outline.
+- [ ] See distinct focus color blocks with clear separation; confirm the break portion and countdown stay green until completion and then turn red.
+- [ ] Confirm unfilled outline portions blend into the panel with no white starting outline; completed portions match the current timer color in the floating bar and editor.
 - [ ] Close both windows in either order and verify no app process or tray icon remains; minimizing should keep the app open in the taskbar.
 
 - [ ] Edit either large focus/break duration and see related timeline times update on every valid keystroke, rounded to whole minutes; input stays intact while typing.

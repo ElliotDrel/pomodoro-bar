@@ -21,15 +21,19 @@ internal static class UiTheme
     internal static readonly SolidColorBrush Warning = Color("#FFAE66");
     internal static readonly SolidColorBrush Scheduled = Color("#F1A7DA");
     internal static readonly SolidColorBrush Error = Color("#FF667B");
-    internal static readonly LinearGradientBrush CountdownTimeline = MakeCountdownTimeline();
-    private static LinearGradientBrush MakeCountdownTimeline()
+    internal static readonly SolidColorBrush Complete = Color("#FF5B6E");
+    internal static readonly (double End,Brush Color)[] FocusTimelineBands = MakeFocusTimeline();
+    private static (double End,Brush Color)[] MakeFocusTimeline()
     {
-        var brush = new LinearGradientBrush { StartPoint = new Point(0,0), EndPoint = new Point(1,0) };
-        foreach (double elapsed in new[] { 0d,.2,.6,.8,.95,1 }) {
-            var rgb = VisualMath.CountdownColor(1-elapsed);
-            brush.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(rgb.R,rgb.G,rgb.B),elapsed));
+        var bands = new (double End,Brush Color)[5];
+        double[] ends = [.2,.6,.8,.95,1];
+        double[] fractions = [1,.8,.4,.2,.05];
+        for (int i=0;i<bands.Length;i++) {
+            var rgb = VisualMath.CountdownColor(fractions[i]);
+            var brush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(rgb.R,rgb.G,rgb.B));
+            brush.Freeze(); bands[i] = (ends[i],brush);
         }
-        brush.Freeze(); return brush;
+        return bands;
     }
     internal static Pen Pen(Brush brush, double width, bool round = false)
     {

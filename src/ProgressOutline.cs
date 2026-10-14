@@ -13,7 +13,8 @@ internal sealed class ProgressOutline
     private Geometry? progressGeometry;
     private double cachedProgress = -1;
     private Brush? brush;
-    private Pen? progressPen, trackPen;
+    private Pen? progressPen;
+    private static readonly Pen TrackPen = UiTheme.Pen(UiTheme.Surface,4,true);
     internal const double Thickness = 6;
     internal void Draw(DrawingContext dc,Size renderSize,double progress,Brush color)
     {
@@ -25,10 +26,9 @@ internal sealed class ProgressOutline
         }
         if (brush != color) {
             brush = color; progressPen = UiTheme.Pen(color,Thickness,true);
-            trackPen = UiTheme.Pen(color,4,true);
         }
         if (cachedProgress != progress) { progressGeometry = PartialOutline(outline,progress); cachedProgress = progress; }
-        dc.DrawGeometry(null,trackPen,outline);
+        dc.DrawGeometry(null,TrackPen,outline);
         if (progressGeometry is not null) dc.DrawGeometry(null,progressPen,progressGeometry);
     }
     internal static Geometry? PartialOutline(PathGeometry outline,double fraction)

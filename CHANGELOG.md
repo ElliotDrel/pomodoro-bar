@@ -8,6 +8,9 @@ See [the request checklist](REQUEST-CHECKLIST.md) for the complete feature revie
 
 ## [Unreleased]
 
+- Blend unfilled perimeter tracks into the panel instead of starting with a white outline; only completed outline progress uses the changing countdown color. Supersede the earlier fully colored outline treatment.
+- Replace the timeline gradient with five distinct solid focus color blocks separated by small gaps. Keep break text, progress color, and timeline green until completion, then red. Verify 200 native assertions, 27 updater assertions, and updated normal/break captures.
+
 - Move the scheduled-start countdown above pause at twice the old label size and remove the redundant endpoint footer. Show the exact countdown color progression on both timeline phases.
 - Share a countdown-colored, thicker perimeter renderer between the floating bar and editor timer panel. Keep the whole outline in the timer’s current color and distinguish completed progress with a thicker stroke.
 - Remove app tray registration entirely. Closing one window retains the other; closing the last visible window disposes timers, audio, updates, and IPC and exits. This supersedes the earlier hide-both-and-keep-running behavior; minimized windows remain open. Verify 197 native and 27 updater assertions plus eight changelog assertions and updated UI captures. Verify actual Dev process exit after closing both windows in each order; the first window alone does not exit the app.
