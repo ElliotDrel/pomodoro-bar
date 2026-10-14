@@ -8,6 +8,8 @@ See [the request checklist](REQUEST-CHECKLIST.md) for the complete feature revie
 
 ## [Unreleased]
 
+- Trim the deploy skill to a precise trigger, Dev command, and publish/restart/verify flow. Remove repeated policy and troubleshooting prose while retaining startup-update behavior, completion evidence, and the Windows AppData constraint. Documentation only; app code and release version are unchanged.
+
 - Simplify routine deployment to publish through CI, run the installed `--restart` once, and verify the expected running version. Remove duplicate local packaging/smoke checks and routine reinstalls/shortcut repair. Document that restart only relaunches and normal startup handles updating; no app flags or updater code changed.
 
 ## [1.2.1] - 2026-10-14

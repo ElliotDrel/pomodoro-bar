@@ -1,22 +1,18 @@
 ---
 name: deploy
-description: Run Pomodoro Bar in Dev or publish a native production release with GitHub Actions and Velopack.
+description: Run Pomodoro Bar in Dev or publish a production release.
 ---
 
 # Deploy
 
-Adapted from Universal Spell Check's Dev/Prod workflow. Explicit user/session instructions and authorization take precedence.
-
 ## Dev
 
-Record every change in `CHANGELOG.md` under Unreleased before committing; preserve released entries. Run `scripts/changelog.ps1` and `tests/Changelog.Tests.ps1`. Push verified committed changes to `origin/main`. Pull and run `dotnet run --project src/PomodoroBar.csproj -c Dev`. Dev has isolated settings and singleton identity and never auto-updates. Rebuild/relaunch native changes. No installer or tag needed.
+Run `dotnet run --project src/PomodoroBar.csproj -c Dev`. Dev uses isolated settings and never auto-updates. Rebuild/relaunch after native changes.
 
-## Prod
+## Prod: publish → restart → verify
 
-1. **Publish.** Set the next semver and dated changelog entry, commit, and push `main` with its matching tag. Wait for successful release CI and the public release. CI handles tests, packaging, startup smoke, installer checks, and uploads; do not repeat local packaging/smoke checks just to publish.
-2. **Restart.** Run the installed `PomodoroBar.exe --restart` once from an ordinary Windows session. Codex's packaged environment can redirect AppData paths. Use the existing installation; do not download/reinstall the installer or repair shortcuts for routine updates.
-3. **Verify.** Wait for the expected version to be running, confirmed by its fresh version-stamped `started` log. The restart command's exit code only acknowledges the request. Leave verified Prod running and report the release link/version. If verification fails, inspect the actual error instead of repeatedly launching the app.
+1. Set the next version and dated `CHANGELOG.md` entry, commit, and push `main` with its semver tag. Wait for successful release CI and a public release. CI handles testing, packaging, and installer checks.
+2. Run the installed `PomodoroBar.exe --restart` once. Normal startup checks and applies updates; the flag only restarts. Leave the app untouched until updating finishes, since interaction defers installation.
+3. Confirm the expected version is running using its fresh version-stamped `started` log. Command acceptance alone is insufficient. Leave Prod running and report its version and release link.
 
-`--restart` only relaunches the app. The normal startup sequence checks, downloads, and applies available updates; the restart flag does not request an update directly. Avoid interacting with the app until startup updating finishes, because interaction defers automatic installation. Do not add flags or another updater.
-
-First installation or a confirmed broken installation is a separate installer task, not part of routine publishing. Preserve settings and backups. Stop only session-owned Dev/testing instances and leave the repository clean and pushed, unless the user requests a local-only commit.
+Run installed commands and verification from an ordinary Windows session: Codex can redirect AppData paths. Routine updates use the existing installation, without local repackaging or reinstallation. Use `scripts/install-prod.ps1` only for first installation or repair. Deployment needs no new flags or updater code.
