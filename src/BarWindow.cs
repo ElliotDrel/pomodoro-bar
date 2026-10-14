@@ -26,6 +26,7 @@ internal sealed class BarWindow : Window
         Vertical = host.Settings.Vertical; ApplyLimits();
         Surface = new BarSurface(host); Content = Surface;
         Width = host.Settings.Width; Height = host.Settings.Height;
+        if (Vertical && Width == 110 && Height == 180) { Width = 64; Height = 200; }
         Left = host.Settings.X; Top = host.Settings.Y;
         SourceInitialized += (_, _) => RestoreReachablePosition();
         SizeChanged += (_, _) => { Surface.InvalidateVisual(); host.ScheduleSave(); };
@@ -73,7 +74,7 @@ internal sealed class BarWindow : Window
         if (Vertical == vertical) return;
         Vertical = vertical; ApplyLimits(); ResetSize(); RestoreReachablePosition(); host.Render();
     }
-    public void ResetSize() { Width = Vertical ? 110 : 280; Height = Vertical ? 180 : 52; host.ScheduleSave(); }
+    public void ResetSize() { Width = Vertical ? 64 : 280; Height = Vertical ? 200 : 52; host.ScheduleSave(); }
 }
 
 internal sealed class BarSurface : FrameworkElement
@@ -91,6 +92,8 @@ internal sealed class BarSurface : FrameworkElement
     private FormattedText? text;
     private int cachedSecond = -1;
     private double cachedDpi;
+    private bool cachedVertical;
+    internal string DisplayedText => text?.Text ?? "";
 
 
 
@@ -132,18 +135,21 @@ internal sealed class BarSurface : FrameworkElement
         outline.Draw(dc,RenderSize,progress,host.CountdownBrush);
         int second = (int)Math.Ceiling(remaining);
         double dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
-        if (text is null || cachedSecond != second || cachedDpi != dpi) {
-            text = new FormattedText(TimerModel.FormatTime(remaining),CultureInfo.InvariantCulture,FlowDirection.LeftToRight,Typeface,28,UiTheme.Ink,dpi);
-            cachedSecond = second; cachedDpi = dpi;
+        if (text is null || cachedSecond != second || cachedDpi != dpi || cachedVertical != host.Bar.Vertical) {
+            string digits = TimerModel.FormatTime(remaining);
+            if (host.Bar.Vertical) digits = digits.Replace(':','\n');
+            text = new FormattedText(digits,CultureInfo.InvariantCulture,FlowDirection.LeftToRight,Typeface,28,UiTheme.Ink,dpi);
+            if (host.Bar.Vertical) text.TextAlignment = TextAlignment.Center;
+            cachedSecond = second; cachedDpi = dpi; cachedVertical = host.Bar.Vertical;
         }
         text.SetForegroundBrush(host.CountdownBrush);
-        layout = BarLayout.Fit(ActualWidth,ActualHeight,text.Width+6,host.Bar.Vertical);
+        layout = BarLayout.Fit(ActualWidth,ActualHeight,text.Width+6,host.Bar.Vertical,Math.Max(80,text.Height+12));
         dc.PushTransform(new MatrixTransform(new Matrix(layout.Scale,0,0,layout.Scale,layout.Left,layout.Top)));
-        dc.DrawText(text,new Point(layout.Vertical ? (layout.LogicalWidth-text.Width)/2 : 8,(52-text.Height)/2));
+        dc.DrawText(text,new Point(layout.Vertical ? layout.LogicalWidth/2 : 8,((layout.Vertical ? layout.TimerHeight : 52)-text.Height)/2));
         for (int i=0;i<3;i++) {
-            double x = layout.Vertical ? (layout.LogicalWidth-28)/2 : layout.TimerWidth+12+i*32+2;
-            double y = layout.Vertical ? 54+i*36 : 10;
-            dc.DrawRoundedRectangle(i == 0 ? phase : hovered == i+2 ? UiTheme.Line : UiTheme.Surface,null,new Rect(x,y,28,32),6,6);
+            var buttonBounds = layout.ButtonBounds(i);
+            double x = buttonBounds.X, y = buttonBounds.Y;
+            dc.DrawRoundedRectangle(i == 0 ? phase : hovered == i+2 ? UiTheme.Line : UiTheme.Surface,null,new Rect(x,y,buttonBounds.Width,buttonBounds.Height),6,6);
             var pen = i == 0 ? PlayPen : GlyphPen;
             if (i == 0 && (t.Running || t.Scheduled)) {
                 dc.DrawLine(pen,new Point(x+10,y+9),new Point(x+10,y+23)); dc.DrawLine(pen,new Point(x+18,y+9),new Point(x+18,y+23));
@@ -175,7 +181,9 @@ internal sealed class BarSurface : FrameworkElement
     }
     private void Release(object sender,MouseButtonEventArgs e)
     {
-        int action = pressed; pressed = -1; dragArmed = false; ReleaseMouseCapture();
+        var point = e.GetPosition(this);
+        int action = layout.Hit(point.X,point.Y) == pressed ? pressed : -1;
+        pressed = -1; dragArmed = false; ReleaseMouseCapture();
         if (action == 2) host.Toggle(); else if (action == 3) host.Skip(); else if (action == 4) host.OpenEditor();
         host.Render(); e.Handled = true;
     }

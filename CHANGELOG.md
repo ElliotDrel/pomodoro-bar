@@ -8,6 +8,10 @@ See [the request checklist](REQUEST-CHECKLIST.md) for the complete feature revie
 
 ## [Unreleased]
 
+- Match floating-button click targets to their visible bounds in horizontal, tiny, and vertical layouts. Keep adjacent space draggable without invoking controls; releasing outside the pressed button cancels the action.
+
+- Stack vertical countdown components on separate lines (minutes above seconds, or hours/minutes/seconds) and narrow the default to 64 × 200 DIPs. Adjust text caching, layout, and button hit targets for both two- and three-line timers; migrate only the old exact 110 × 180 vertical default, preserving custom geometry.
+
 - Blend unfilled perimeter tracks into the panel instead of starting with a white outline; only completed outline progress uses the changing countdown color. Supersede the earlier fully colored outline treatment.
 - Replace the timeline gradient with five distinct solid focus color blocks separated by small gaps. Keep break text, progress color, and timeline green until completion, then red. Verify 200 native assertions, 27 updater assertions, and updated normal/break captures.
 

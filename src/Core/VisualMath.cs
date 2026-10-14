@@ -3,25 +3,29 @@ using System;
 namespace PomodoroBar.Core;
 
 public readonly record struct Rgb(byte R, byte G, byte B);
-public readonly record struct BarLayout(double Scale, double Left, double Top, double TimerWidth, bool Vertical = false)
+public readonly record struct BarLayout(double Scale, double Left, double Top, double TimerWidth, bool Vertical = false, double TimerHeight = 80)
 {
-    public double LogicalWidth => Vertical ? Math.Max(100, TimerWidth + 16) : TimerWidth + 116;
-    public double LogicalHeight => Vertical ? 160 : 52;
-    public static BarLayout Fit(double width, double height, double textWidth, bool vertical = false)
+    public double LogicalWidth => Vertical ? Math.Max(64, TimerWidth + 16) : TimerWidth + 116;
+    public double LogicalHeight => Vertical ? TimerHeight + 108 : 52;
+    public static BarLayout Fit(double width, double height, double textWidth, bool vertical = false, double timerHeight = 80)
     {
-        double logicalWidth = vertical ? Math.Max(100,textWidth + 16) : textWidth + 116;
-        double logicalHeight = vertical ? 160 : 52;
+        double logicalWidth = vertical ? Math.Max(64,textWidth + 16) : textWidth + 116;
+        double logicalHeight = vertical ? timerHeight + 108 : 52;
         double scale = Math.Min(width / logicalWidth, height / logicalHeight);
-        return new(scale, (width-logicalWidth*scale)/2, (height-logicalHeight*scale)/2,textWidth,vertical);
+        return new(scale, (width-logicalWidth*scale)/2, (height-logicalHeight*scale)/2,textWidth,vertical,timerHeight);
     }
     public int Hit(double x, double y)
     {
         x = (x-Left)/Scale; y = (y-Top)/Scale;
         if (x < 0 || x > LogicalWidth || y < 0 || y > LogicalHeight) return -1;
-        if (Vertical) return y < 52 ? 1 : Math.Min(4,2+(int)((y-52)/36));
-        if (x < TimerWidth+12) return 1;
-        return Math.Min(4,2+(int)((x-TimerWidth-12)/32));
+        for (int button=0;button<3;button++) {
+            var bounds = ButtonBounds(button);
+            if (x >= bounds.X && x < bounds.X+bounds.Width && y >= bounds.Y && y < bounds.Y+bounds.Height) return button+2;
+        }
+        return 1;
     }
+    public (double X,double Y,double Width,double Height) ButtonBounds(int button)
+        => (Vertical ? (LogicalWidth-28)/2 : TimerWidth+12+button*32+2, Vertical ? TimerHeight+2+button*36 : 10,28,32);
 }
 
 public static class VisualMath

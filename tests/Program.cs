@@ -80,7 +80,14 @@ internal static class Tests
             }
             var vertical = BarLayout.Fit(110,180,86,true);
             Check(vertical.LogicalWidth*vertical.Scale<=110 && vertical.LogicalHeight*vertical.Scale<=180,"vertical layout fits upright countdown");
-            for (int button=0;button<3;button++) Check(vertical.Hit(vertical.Left+vertical.LogicalWidth/2*vertical.Scale,vertical.Top+(68+button*36)*vertical.Scale)==button+2,"vertical hit targets match stacked buttons");
+            for (int button=0;button<3;button++) Check(vertical.Hit(vertical.Left+vertical.LogicalWidth/2*vertical.Scale,vertical.Top+(vertical.TimerHeight+16+button*36)*vertical.Scale)==button+2,"vertical hit targets match stacked buttons");
+            foreach (var boundsLayout in new[] { BarLayout.Fit(280,52,86),BarLayout.Fit(130,20,86),BarLayout.Fit(64,200,42,true) }) {
+                for (int button=0;button<3;button++) {
+                    var bounds = boundsLayout.ButtonBounds(button);
+                    foreach (var point in new[] { (bounds.X-1,bounds.Y+16),(bounds.X+bounds.Width+1,bounds.Y+16),(bounds.X+14,bounds.Y-1),(bounds.X+14,bounds.Y+bounds.Height+1) })
+                        Check(boundsLayout.Hit(boundsLayout.Left+point.Item1*boundsLayout.Scale,boundsLayout.Top+point.Item2*boundsLayout.Scale)==1,"space outside visible button never invokes a control");
+                }
+            }
             now=0;var scheduled=new TimerModel(1500,300,[40,20],()=>now);scheduled.Schedule(600);
             Near(scheduled.SecondsUntilNextEvent(),600,"engine schedules exact future start");
             now=605;Check(scheduled.Tick() is null && scheduled.Running,"scheduled focus auto-starts");Near(scheduled.Remaining,1495,"scheduled late tick catches up");
@@ -248,6 +255,8 @@ internal static class Tests
         host.Editor.CancelEdit();
         host.Editor.OrientationButton.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent)); Pump();
         Check(host.Bar.Vertical && host.Bar.Surface.Layout.Vertical,"orientation button selects vertical bar");
+        Near(host.Bar.Width,64,"default vertical bar is narrow");
+        Check(host.Bar.Surface.DisplayedText==TimerModel.FormatTime(host.Timer.Remaining).Replace(':','\n'),"vertical countdown stacks minutes above seconds");
         host.Save(); Check(Settings.Load(Path.Combine(scratch,"gui.json")).Vertical,"vertical orientation and geometry persist");
         host.Bar.SetVertical(false); host.Reset();Check(audio.Last is null,"reset stops audio");
         var controls = Descendants<Button>(host.Editor).ToArray();

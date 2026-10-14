@@ -4,6 +4,10 @@ See [CHANGELOG.md](CHANGELOG.md) for dated Dev/Prod changes between versions. Th
 
 ## Check the latest UI requests
 
+- [ ] Click next to each floating button in both orientations and at minimum size; confirm it does not activate. Press inside and release outside a button; confirm it cancels.
+
+- [ ] Select vertical mode and confirm minutes are above seconds in a narrow 64 × 200 default, with controls underneath; verify hours stack too and switching back restores horizontal digits.
+
 - [ ] Find the larger scheduled **Starts in** countdown directly above pause; confirm the old small countdown and redundant endpoint footer are gone.
 - [ ] See distinct focus color blocks with clear separation; confirm the break portion and countdown stay green until completion and then turn red.
 - [ ] Confirm unfilled outline portions blend into the panel with no white starting outline; completed portions match the current timer color in the floating bar and editor.
