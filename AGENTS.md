@@ -2,12 +2,12 @@
 
 ## Project
 
-Native C#/.NET 10 Windows app: WPF windows, direct Windows shell tray, Velopack installer/updater. This supersedes Python/Tkinter. Keep the floating bar separate from the editor. Release installers bundle .NET.
+Native C#/.NET 10 Windows app: WPF windows without a tray entry, Velopack installer/updater. This supersedes Python/Tkinter. Keep the floating bar separate from the editor. Release installers bundle .NET.
 
 ## Preserve
 
 - One app and one desktop shortcut named Pomodoro Bar. Both independent windows appear in the taskbar and Alt+Tab; startup and relaunch show both. Do not suppress either window's taskbar presence.
-- Closing either window hides only that window. Quit alone exits the app; both windows can be reopened through tray/relaunch.
+- Register no tray/hidden-icons entry. Closing one window hides it while the other is open; closing the last visible window exits and disposes all background work. Reopen one hidden window through the visible window or relaunch. Minimized windows remain open. This supersedes the old tray-backed lifetime.
 
 - Use a thick progress outline instead of a circle. Uniformly scale countdown, controls, and hit targets down to 130 × 20 DIPs.
 - Mirror the active countdown in the editor without overwriting input. Apply valid duration/clock edits on each keystroke; round configured edits to minutes. Schedule future starts with a pink countdown, reject past starts with a red error and reset to now. Persist vertical bar orientation.
@@ -27,12 +27,13 @@ Native C#/.NET 10 Windows app: WPF windows, direct Windows shell tray, Velopack 
 | src/Core/ | Deadline and scheduled-start engine, settings, recovery/migration, color/layout math |
 | src/Core/ClockTime.cs | Rounded editable clock parsing, explicit next-day dates, and end-time formatting |
 | src/BarWindow.cs | Horizontal/vertical floating countdown, perimeter progress, hit targets, moving, and native resizing |
+| src/ProgressOutline.cs | Shared thicker countdown-colored perimeter geometry and editor timer-panel frame |
 | src/EditorWindow.cs | Editable focus/break durations, scheduled start and timeline endpoints, play/skip, and orientation controls |
 | src/UiTheme.cs | Shared palette, keyboard-focus button/switch templates, and menu styling |
 | src/AppIcon.cs | Shared embedded window/taskbar icon and owned native tray icon handles |
-| src/NativeTray.cs | Windows shell tray registration, native menus, keyboard activation, Explorer recovery and icon cleanup |
+| src/NativeTray.cs | Retained legacy tray helper; unused by the app and current test/audit harness |
 | src/MonitorAreas.cs | Native monitor work areas without loading WinForms |
-| src/AppHost.cs | Controller, alerts, tray, lifecycle and settings |
+| src/AppHost.cs | Controller, shared countdown colors, alerts, last-window shutdown, and settings |
 | src/Program.cs | Entry point, Velopack, singleton, migration, smoke mode |
 | src/BuildChannel.cs, src/Log.cs | Channel identity, paths and diagnostics |
 | src/InstanceServer.cs | Current-user relaunch/restart IPC |

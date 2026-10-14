@@ -32,7 +32,7 @@ internal sealed class AppHost : IDisposable
     internal DateTimeOffset BreakEnd => Timer.IsFocus ? FocusEnd.AddSeconds(Timer.Rest) : TimerModel.EstimatedEnd(Now,Timer.Waiting ? Timer.SecondsToDeadline : Timer.Remaining);
     private readonly IAudio audio;
     private readonly DispatcherTimer tick, save, animation;
-    private readonly NativeTray? tray;
+
     private readonly UpdateService? updates;
     private readonly InstanceServer? server;
     private bool disposed;
@@ -70,19 +70,6 @@ internal sealed class AppHost : IDisposable
                 updates.ApplyRequested += () => Application.Current.Dispatcher.BeginInvoke(() => { if (CanAutoRestart) InstallUpdate(); });
                 Editor.UpdateDetails(updates);
             }
-            tray = new NativeTray(OpenEditor);
-            void Item(string text, Action action) => tray.Item(text,action);
-            Item("Edit timer",OpenEditor); Item("Show floating bar",() => { Bar.Show(); Render(); });
-            Item("Play / pause",() => { Silence(); Toggle(); });
-            Item("Reset session",Reset);
-            tray.Separator();
-            Item("Silence alarm",Silence);
-            if (!smoke && updates?.CanUpdate == true) {
-                tray.Item("Check for updates",CheckUpdates,() => !updates.IsBusy);
-                tray.Item("Install downloaded update",InstallUpdate,() => updates.HasPending);
-                Item("Restart",Restart);
-            }
-            Item("Quit",Quit);
             if (!smoke) server = new InstanceServer(command => Application.Current.Dispatcher.InvokeAsync(() => {
                 if (command == "restart") { Log.Write("restart_command_received"); if (updates?.CanUpdate != true) return false; Restart(); return true; }
                 if (command == "check") { if (updates?.CanUpdate != true) return false; CheckUpdates(); return true; }
@@ -176,6 +163,27 @@ internal sealed class AppHost : IDisposable
     {
         Timer.SetEndpoint(focus,seconds); sessionTouched = true; Silence(); pulseUntil = 0;
         Settings = Settings with { Focus = Timer.Focus, Rest = Timer.Rest }; ScheduleSave(); Render();
+    }
+    internal void CloseWindow(Window window)
+    {
+        window.Hide(); Render();
+        // Run after WPF finishes the Closing event, avoiding reentrant Close calls.
+        Application.Current.Dispatcher.BeginInvoke(() => {
+            if (!Closing && !Bar.IsVisible && !Editor.IsVisible) Quit();
+        });
+    }
+    private Rgb? displayedCountdownColor;
+    private System.Windows.Media.SolidColorBrush? displayedCountdownBrush;
+    internal System.Windows.Media.SolidColorBrush CountdownBrush {
+        get {
+            if (Timer.Scheduled) return UiTheme.Scheduled;
+            var color = VisualMath.CountdownColor(Timer.Remaining/Timer.Duration);
+            if (displayedCountdownColor != color) {
+                displayedCountdownBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(color.R,color.G,color.B));
+                displayedCountdownBrush.Freeze(); displayedCountdownColor = color;
+            }
+            return displayedCountdownBrush!;
+        }
     }
     private static bool Visible(Window? window) => window is not null && window.IsVisible && window.WindowState != WindowState.Minimized;
     internal bool WakeScheduled => tick.IsEnabled;
@@ -283,7 +291,7 @@ internal sealed class AppHost : IDisposable
     private void Report(string text)
     {
         Editor.Note(text);
-        if (!Editor.IsVisible) tray?.ShowWarning(BuildChannel.DisplayName,text);
+
     }
     public void Dispose()
     {
@@ -291,6 +299,6 @@ internal sealed class AppHost : IDisposable
         tick.Stop(); animation.Stop(); save.Stop(); server?.Dispose(); updates?.Dispose(); audio.Dispose();
         Microsoft.Win32.SystemEvents.PowerModeChanged -= PowerChanged;
         Microsoft.Win32.SystemEvents.TimeChanged -= TimeChanged;
-        tray?.Dispose(); Editor.Close(); Bar.Close();
+        Editor.Close(); Bar.Close();
     }
 }

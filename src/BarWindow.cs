@@ -30,7 +30,7 @@ internal sealed class BarWindow : Window
         SourceInitialized += (_, _) => RestoreReachablePosition();
         SizeChanged += (_, _) => { Surface.InvalidateVisual(); host.ScheduleSave(); };
         LocationChanged += (_, _) => host.ScheduleSave();
-        Closing += (_, e) => { if (!host.Closing) { e.Cancel = true; host.Silence(); Hide(); host.Render(); } };
+        Closing += (_, e) => { if (!host.Closing) { e.Cancel = true; host.Silence(); host.CloseWindow(this); } };
         var menu = UiTheme.Menu();
         void Item(string text, Action action) { var item = new MenuItem { Header = text }; item.Click += (_, _) => { host.Silence(); action(); }; menu.Items.Add(item); }
         Item("Edit timer", host.OpenEditor); Item("Reset session", host.Reset); Item("Reset bar size",ResetSize);
@@ -86,17 +86,16 @@ internal sealed class BarSurface : FrameworkElement
     internal BarLayout Layout => layout;
     internal static SolidColorBrush Brush(string hex) => new((Color)ColorConverter.ConvertFromString(hex));
     private static readonly Typeface Typeface = new(UiTheme.Digits,FontStyles.Normal,FontWeights.Normal,FontStretches.Normal);
-    private static readonly Pen BorderPen = UiTheme.Pen(UiTheme.Line,3), FocusPen = UiTheme.Pen(UiTheme.Focus,3,true),
-        RestPen = UiTheme.Pen(UiTheme.Rest,3,true), ScheduledPen = UiTheme.Pen(UiTheme.Scheduled,3,true),
-        GlyphPen = UiTheme.Pen(UiTheme.Ink,2,true), PlayPen = UiTheme.Pen(UiTheme.Background,2,true);
+    private static readonly Pen GlyphPen = UiTheme.Pen(UiTheme.Ink,2,true), PlayPen = UiTheme.Pen(UiTheme.Background,2,true);
+    private readonly ProgressOutline outline = new();
     private FormattedText? text;
     private int cachedSecond = -1;
     private double cachedDpi;
-    private Brush? cachedBrush;
-    private PathGeometry? outline;
-    private Size outlineSize;
-    private Geometry? progressGeometry;
-    private double cachedProgress = -1;
+
+
+
+
+
     private readonly SolidColorBrush pulseBrush = new();
     private (int Second,double Progress,bool Focus,bool Running,bool Waiting,bool Pulse,bool Resize,bool Vertical,bool Scheduled)? displayed;
     internal int RenderCount { get; private set; }
@@ -110,7 +109,7 @@ internal sealed class BarSurface : FrameworkElement
     public BarSurface(AppHost host)
     {
         this.host = host;
-        ToolTip = "Drag countdown to move · pencil to edit · right-click for more";
+        ToolTip = "Drag countdown to move Â· pencil to edit Â· right-click for more";
         MouseLeftButtonDown += Press; MouseMove += Move; MouseLeftButtonUp += Release;
         LostMouseCapture += (_,_) => { pressed = -1; dragArmed = false; };
         MouseLeave += (_,_) => { hovered = -1; InvalidateVisual(); };
@@ -123,33 +122,21 @@ internal sealed class BarSurface : FrameworkElement
         double remaining = t.Scheduled ? t.StartRemaining : t.Remaining;
         double progress = t.Scheduled ? t.StartProgress : t.Progress;
         Brush phase = t.Scheduled ? UiTheme.Scheduled : t.IsFocus ? UiTheme.Focus : UiTheme.Rest;
-        Pen phasePen = t.Scheduled ? ScheduledPen : t.IsFocus ? FocusPen : RestPen;
+
         double pulse = host.Pulsing ? (SystemParameters.ClientAreaAnimation ? .5+.5*Math.Sin(Environment.TickCount64*Math.PI/500d) : .6)*.55 : 0;
         byte Blend(byte a,byte b) => (byte)Math.Round(a+(b-a)*pulse);
         pulseBrush.Color = Color.FromRgb(Blend(41,255),Blend(54,188),Blend(64,112));
         dc.DrawRectangle(UiTheme.Background,null,new Rect(RenderSize));
-        var bounds = new Rect(2,2,Math.Max(0,ActualWidth-4),Math.Max(0,ActualHeight-4));
-        dc.DrawRoundedRectangle(pulse == 0 ? UiTheme.Surface : pulseBrush,BorderPen,bounds,7,7);
-        if (outline is null || outlineSize != RenderSize) {
-            outline = new RectangleGeometry(bounds,7,7).GetFlattenedPathGeometry(.2,ToleranceType.Absolute);
-            outline.Freeze(); outlineSize = RenderSize; cachedProgress = -1;
-        }
-        if (cachedProgress != progress) { progressGeometry = PartialOutline(outline,progress); cachedProgress = progress; }
-        if (progressGeometry is not null) dc.DrawGeometry(null,phasePen,progressGeometry);
+        var bounds = new Rect(3,3,Math.Max(0,ActualWidth-6),Math.Max(0,ActualHeight-6));
+        dc.DrawRoundedRectangle(pulse == 0 ? UiTheme.Surface : pulseBrush,null,bounds,7,7);
+        outline.Draw(dc,RenderSize,progress,host.CountdownBrush);
         int second = (int)Math.Ceiling(remaining);
         double dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
         if (text is null || cachedSecond != second || cachedDpi != dpi) {
             text = new FormattedText(TimerModel.FormatTime(remaining),CultureInfo.InvariantCulture,FlowDirection.LeftToRight,Typeface,28,UiTheme.Ink,dpi);
-            cachedSecond = second; cachedDpi = dpi; cachedBrush = null;
+            cachedSecond = second; cachedDpi = dpi;
         }
-        Brush countdown;
-        if (t.Scheduled) countdown = UiTheme.Scheduled;
-        else {
-            var rgb = VisualMath.CountdownColor(remaining/t.Duration);
-            if (cachedBrush is SolidColorBrush previous && previous.Color == Color.FromRgb(rgb.R,rgb.G,rgb.B)) countdown = previous;
-            else { var brush = new SolidColorBrush(Color.FromRgb(rgb.R,rgb.G,rgb.B)); brush.Freeze(); countdown = brush; }
-        }
-        if (cachedBrush != countdown) { text.SetForegroundBrush(countdown); cachedBrush = countdown; }
+        text.SetForegroundBrush(host.CountdownBrush);
         layout = BarLayout.Fit(ActualWidth,ActualHeight,text.Width+6,host.Bar.Vertical);
         dc.PushTransform(new MatrixTransform(new Matrix(layout.Scale,0,0,layout.Scale,layout.Left,layout.Top)));
         dc.DrawText(text,new Point(layout.Vertical ? (layout.LogicalWidth-text.Width)/2 : 8,(52-text.Height)/2));
@@ -172,34 +159,6 @@ internal sealed class BarSurface : FrameworkElement
             }
         }
         dc.Pop();
-    }
-    private static Geometry? PartialOutline(PathGeometry outline,double fraction)
-    {
-        if (fraction <= 0) return null;
-        if (fraction >= 1) return outline;
-        var points = new System.Collections.Generic.List<Point>();
-        foreach (var figure in outline.Figures) {
-            points.Add(figure.StartPoint);
-            foreach (var segment in figure.Segments) {
-                if (segment is PolyLineSegment poly) points.AddRange(poly.Points);
-                else if (segment is LineSegment line) points.Add(line.Point);
-            }
-            if (figure.IsClosed) points.Add(figure.StartPoint);
-        }
-        double length = 0;
-        for (int i=1;i<points.Count;i++) length += (points[i]-points[i-1]).Length;
-        double left = length*fraction;
-        var result = new StreamGeometry();
-        using (var ctx = result.Open()) {
-            ctx.BeginFigure(points[0],false,false);
-            for (int i=1;i<points.Count && left > 0;i++) {
-                double distance = (points[i]-points[i-1]).Length;
-                if (distance == 0) continue;
-                ctx.LineTo(left >= distance ? points[i] : points[i-1]+(points[i]-points[i-1])*(left/distance),true,false);
-                left -= distance;
-            }
-        }
-        result.Freeze(); return result;
     }
     private void Press(object sender,MouseButtonEventArgs e)
     {

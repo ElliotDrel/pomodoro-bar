@@ -13,7 +13,8 @@ internal sealed class EditorWindow : Window
 {
     private readonly AppHost host;
     internal readonly TextBox TimeCard;
-    internal readonly TextBlock EndTime;
+    internal readonly TextBlock StartCountdown;
+    internal readonly TimerPanel TimerPanel;
     internal readonly TextBox BreakCard, StartTimeCard, FocusEndCard, BreakEndCard;
     internal readonly Button PlayButton, SkipButton, OrientationButton;
     private TextBox? activeField;
@@ -30,12 +31,6 @@ internal sealed class EditorWindow : Window
     internal readonly Button UpdateButton;
     private bool updateReady;
     private bool editing, dirty, syncing;
-
-
-
-
-
-
 
     internal int SyncCount { get; private set; }
     internal bool Editing => editing;
@@ -72,7 +67,11 @@ internal sealed class EditorWindow : Window
         SkipButton = UiTheme.Button(TimerGlyph(false,true),host.Skip); SkipButton.Padding = new Thickness(10,7,10,7);
         AutomationProperties.SetName(SkipButton,"Skip section"); SkipButton.ToolTip = "Skip section";
         timerControls.Children.Add(PlayButton); timerControls.Children.Add(SkipButton);
-        Grid.SetColumn(timerControls,1); durationRow.Children.Add(timerControls);
+        var controlsPanel = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        StartCountdown = UiTheme.Text("",24,true,UiTheme.Scheduled); StartCountdown.TextAlignment = TextAlignment.Center;
+        StartCountdown.MaxWidth = 160; StartCountdown.Visibility = Visibility.Collapsed;
+        controlsPanel.Children.Add(StartCountdown); controlsPanel.Children.Add(timerControls);
+        Grid.SetColumn(controlsPanel,1); durationRow.Children.Add(controlsPanel);
         var restPanel = new StackPanel { HorizontalAlignment = HorizontalAlignment.Right };
         var restHeading = UiTheme.Text("Break time",14,false,UiTheme.Rest); restHeading.TextAlignment = TextAlignment.Right; restPanel.Children.Add(restHeading);
         BreakCard = TimeInput(48,"Break duration. Enter minutes, MM:SS, or HH:MM:SS."); BreakCard.TextAlignment = TextAlignment.Right;
@@ -94,8 +93,8 @@ internal sealed class EditorWindow : Window
         card.Children.Add(milestoneGrid);
         inputError = UiTheme.Text("",12,ink:UiTheme.Error); inputError.Visibility = Visibility.Collapsed;
         inputError.Margin = new Thickness(0,8,0,0); card.Children.Add(inputError);
-        EndTime = UiTheme.Text("",12,ink:UiTheme.Muted); EndTime.Margin = new Thickness(0,12,0,0); card.Children.Add(EndTime);
-        panel.Children.Add(new Border { Child = card, Padding = new Thickness(18,16,18,16), Background = UiTheme.Surface, CornerRadius = new CornerRadius(14) });
+        TimerPanel = new TimerPanel { Child = card, Padding = new Thickness(18,16,18,16), Background = UiTheme.Surface, CornerRadius = new CornerRadius(14) };
+        panel.Children.Add(TimerPanel);
         AlarmButton = UiTheme.Button("Silence alarm and start next section",host.Acknowledge,true);
         AlarmButton.Margin = new Thickness(0,8,0,0); AlarmButton.Visibility = Visibility.Collapsed; panel.Children.Add(AlarmButton);
         var sessionRow = new DockPanel { Margin = new Thickness(0,20,0,8) };
@@ -204,15 +203,18 @@ internal sealed class EditorWindow : Window
             dayLabels[field].Text = rounded.Date == host.Now.Date ? "" : rounded.Date == host.Now.Date.AddDays(1) ? "tomorrow" : rounded.ToString("MMM d");
         }
         SetClock(StartTimeCard,host.PreviewStart); SetClock(FocusEndCard,host.FocusEnd); SetClock(BreakEndCard,host.BreakEnd);
-        TimeCard.Foreground = t.Scheduled ? UiTheme.Scheduled : UiTheme.Ink;
-        BreakCard.Foreground = UiTheme.Rest;
+        TimeCard.Foreground = t.IsFocus ? host.CountdownBrush : UiTheme.Ink;
+        BreakCard.Foreground = t.IsFocus ? UiTheme.Rest : host.CountdownBrush;
+        TimerPanel.Set(t.Scheduled ? t.StartProgress : t.Progress,host.CountdownBrush);
         session.Text = $"{(t.Focus+t.Rest)/60:0.##} min total";
         double fraction = t.Focus/(t.Focus+t.Rest);
         cycle.Set(fraction,t.Scheduled ? 0 : t.Progress);
         double labelFraction = Math.Clamp(fraction,.35,.85);
         milestoneGrid.ColumnDefinitions[0].Width = new GridLength(labelFraction,GridUnitType.Star);
         milestoneGrid.ColumnDefinitions[1].Width = new GridLength(1-labelFraction,GridUnitType.Star);
-        status.Text = t.Scheduled ? "Starts in " + TimerModel.FormatTime(t.StartRemaining) : t.Waiting ? "Time is up" : t.Running ? (t.IsFocus ? "Focusing" : "On break") : "Paused";
+        status.Text = t.Scheduled ? "Scheduled" : t.Waiting ? "Time is up" : t.Running ? (t.IsFocus ? "Focusing" : "On break") : "Paused";
+        StartCountdown.Text = "Starts in " + TimerModel.FormatTime(t.StartRemaining);
+        StartCountdown.Visibility = t.Scheduled ? Visibility.Visible : Visibility.Collapsed;
         status.Foreground = t.Scheduled ? UiTheme.Scheduled : t.Waiting ? UiTheme.Warning : UiTheme.Muted;
         bool playing = t.Running || t.Scheduled;
         if (displayedPlaying != playing) { PlayButton.Content = TimerGlyph(playing,false); displayedPlaying = playing; }
@@ -220,10 +222,7 @@ internal sealed class EditorWindow : Window
         AlarmButton.Visibility = t.Waiting ? Visibility.Visible : Visibility.Collapsed;
         ShowBar.IsChecked = host.Bar.IsVisible; ResizeBar.IsChecked = host.Bar.ResizeEnabled;
         OrientationButton.Content = host.Bar.Vertical ? "Use horizontal bar" : "Use vertical bar";
-        EndTime.Text = t.Scheduled ? "Scheduled for " + ClockTime.Format(host.PreviewStart,host.Now) + ". Focus starts automatically."
-            : t.Waiting ? (t.IsFocus ? "Focus complete. Start the break when ready." : "Break complete.")
-            : (t.Running ? "Ends at " : "If started now · ends at ") + ClockTime.Format(t.IsFocus ? host.FocusEnd : host.BreakEnd,host.Now);
-        if (t.IsFocus && !t.Waiting) EndTime.Text += " · break end assumes immediate acknowledgement.";
+
     }
     internal double SecondsUntilPreviewChange()
     {
@@ -258,7 +257,7 @@ internal sealed class EditorWindow : Window
         updateAction.Foreground = updateReady ? UiTheme.Background : UiTheme.Ink;
         AutomationProperties.SetName(UpdateButton,updateAction.Text);
     }
-    private void CloseEditor() { if (FinishEdit()) Hide(); }
+    private void CloseEditor() { CancelEdit(); host.CloseWindow(this); }
 }
 
 internal sealed class CycleStrip : FrameworkElement
@@ -273,8 +272,8 @@ internal sealed class CycleStrip : FrameworkElement
     protected override void OnRender(DrawingContext dc)
     {
         double width = Math.Max(0,ActualWidth), split = width*focus;
-        dc.DrawRectangle(UiTheme.Focus,null,new Rect(0,8,split,8));
-        dc.DrawRectangle(UiTheme.Rest,null,new Rect(split,8,width-split,8));
+        dc.DrawRectangle(UiTheme.CountdownTimeline,null,new Rect(0,8,split,8));
+        dc.DrawRectangle(UiTheme.CountdownTimeline,null,new Rect(split,8,width-split,8));
         dc.DrawLine(TickPen,new Point(1,4),new Point(1,21));
         dc.DrawLine(TickPen,new Point(split,4),new Point(split,21));
         dc.DrawLine(TickPen,new Point(Math.Max(1,width-1),4),new Point(Math.Max(1,width-1),21));

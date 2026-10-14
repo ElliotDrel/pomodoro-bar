@@ -138,20 +138,11 @@ internal static class Tests
         var wallStart=DateTimeOffset.Now.Date.AddHours(14);
         using var host=new AppHost(new Settings(),Path.Combine(scratch,"gui.json"),audio,()=>now,services:false,wallClock:()=>new DateTimeOffset(wallStart).AddSeconds(now));
         Pump();
-        int trayOpens = 0;
-        using (var tray = new NativeTray(() => trayOpens++)) {
-            Check(tray.Registered || GetShellWindow()==IntPtr.Zero,"native tray registers or safely defers when CI has no desktop shell");
-            SendMessage(tray.Handle,0x8001,new IntPtr(1),new IntPtr(0x203));
-            SendMessage(tray.Handle,0x8001,IntPtr.Zero,new IntPtr(0x10000 | 0x401));
-            Check(trayOpens==2,"native tray handles legacy double-click and version-four keyboard activation");
-            SendMessage(tray.Handle,RegisterWindowMessage("TaskbarCreated"),IntPtr.Zero,IntPtr.Zero);
-            Check(tray.Registered || GetShellWindow()==IntPtr.Zero,"native tray re-registers or safely defers after shell recreation");
-            tray.Dispose();Check(!tray.Registered,"native tray releases shell registration");
-        }
+        Check(!typeof(AppHost).GetFields(System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Instance).Any(f=>f.FieldType==typeof(NativeTray)),"app host has no tray registration or tray-owned lifetime");
         Check(MonitorAreas.WorkingAreas().Count>0,"native monitor work areas available without WinForms");
         Check(!AppDomain.CurrentDomain.GetAssemblies().Any(a=>a.GetName().Name=="System.Windows.Forms"),"native windows and tray do not load a second UI framework");
         Check(host.Bar.IsVisible && host.Editor.IsVisible,"startup opens both windows by default");
-        Check(host.Editor.EndTime.Text.StartsWith("If started now · ends at "+wallStart.AddMinutes(25).ToString("t")),"paused editor previews focus end if started now");
+        Check(host.Editor.FocusEndCard.Text==wallStart.AddMinutes(25).ToString("t"),"paused editor previews focus end if started now");
         Check(host.CanAutoRestart,"default editor visibility does not count as user interaction");
         Near(host.WakeInterval.TotalSeconds,30,"paused visible editor schedules rounded end-preview boundary");
         Check(!host.AnimationScheduled,"paused bar does not animate");
@@ -176,11 +167,11 @@ internal static class Tests
         Check(host.Editor.AlarmButton.Visibility==Visibility.Visible,"reopened completion remains acknowledgeable");
         now=0;host.Reset();Pump();
         wallStart=wallStart.Date.AddHours(23).AddMinutes(50);host.Render();
-        Check(host.Editor.EndTime.Text.StartsWith("If started now · ends at "+wallStart.Date.AddDays(1).AddMinutes(15).ToString("t")+" tomorrow"),"editor labels next-day end times");
+        Check(host.Editor.FocusEndCard.Text==wallStart.Date.AddDays(1).AddMinutes(15).ToString("t"),"editor labels next-day end times");
         host.SetTime(1200);host.Toggle();host.Tick();
-        Check(host.Editor.EndTime.Text.Contains(" tomorrow"),"running cross-midnight end starts with tomorrow label");
+        Check(host.FocusEnd.Date==host.Now.Date.AddDays(1),"running cross-midnight end starts with tomorrow label");
         now=600;host.Tick();
-        Check(host.Editor.EndTime.Text.StartsWith("Ends at "+wallStart.Date.AddDays(1).AddMinutes(10).ToString("t")),"cached running end label changes when midnight passes");
+        Check(host.Editor.FocusEndCard.Text==wallStart.Date.AddDays(1).AddMinutes(10).ToString("t"),"cached running end label changes when midnight passes");
         now=0;host.SetSession(30,[40,20]);
         wallStart=wallStart.Date.AddHours(14);host.Render();
         host.OpenEditor(); Pump();
@@ -220,6 +211,7 @@ internal static class Tests
         Edit(host.Editor.TimeCard,"07:42");
         Near(host.Timer.Remaining,480,"typing updates focus immediately and rounds to nearest minute");
         Check(host.Editor.FocusEndCard.Text==TimerModel.EstimatedEnd(host.Now,480).ToString("t"),"end field updates on keystroke");
+        Check(host.Editor.TimeCard.Foreground==host.CountdownBrush && host.Editor.TimerPanel.ProgressColor==host.CountdownBrush,"running editor text and perimeter use the same changing color");
         now+=3;host.Tick();Check(host.Editor.TimeCard.Text=="07:42","live sync protects edited input");
         Check(host.Editor.FinishEdit(),"finish live duration edit");
         Near(host.Timer.Remaining,477,"finishing a live edit does not reset the running deadline");
@@ -235,6 +227,9 @@ internal static class Tests
         Check(host.Timer.Scheduled && !host.Timer.Running,"future start schedules focus automatically");
         Near(host.Timer.StartRemaining,600,"scheduled countdown measures time to start");
         Check(host.Editor.TimeCard.Text=="25:00" && host.Editor.FocusEndCard.Text=="2:35 PM" && host.Editor.BreakEndCard.Text=="2:40 PM","scheduled editor shows durations and both planned endpoints");
+        Check(host.Editor.StartCountdown.FontSize>=24 && host.Editor.StartCountdown.Visibility==Visibility.Visible,"scheduled countdown is at least twice the old label size");
+        Check(host.Editor.TimerPanel.ProgressColor==host.CountdownBrush && host.Editor.TimeCard.Foreground==host.CountdownBrush,"editor countdown and progress border share scheduled color");
+        Check(UiTheme.CountdownTimeline.GradientStops.Count==6,"timeline includes complete countdown color ramp");
         host.Editor.CancelEdit(); host.Bar.Hide();host.Editor.Hide();
         Near(host.WakeInterval.TotalSeconds,600,"hidden scheduled timer sleeps until start deadline");
         now=605;host.Tick(); Check(host.Timer.Running && !host.Timer.Scheduled,"late wake starts scheduled focus");
@@ -317,14 +312,14 @@ internal static class Tests
         host.OpenEditor();host.Bar.Close();Pump();
         Check(!host.Closing && !host.Bar.IsVisible && host.Editor.IsVisible && host.Timer.Running,"closing bar leaves editor and timer running");
         Check(host.Editor.ShowInTaskbar,"closing bar preserves editor taskbar access");
-        host.Editor.Close();Pump();
-        Check(!host.Closing && host.Timer.Running && !host.Bar.IsVisible && !host.Editor.IsVisible,"closing both windows keeps app running");
         host.ShowApp();Pump();
         Check(host.Editor.IsVisible && host.Bar.IsVisible,"relaunch reopens both windows");
         host.Editor.WindowState=WindowState.Minimized;host.Bar.WindowState=WindowState.Minimized;
         host.ShowApp();Pump();
         Check(host.Editor.WindowState==WindowState.Normal && host.Bar.WindowState==WindowState.Normal,"relaunch restores both minimized windows");
-        host.Quit();Pump();Check(host.Closing,"explicit Quit exits both windows");
+        host.Bar.Close();Pump();Check(!host.Closing && host.Editor.IsVisible,"closing bar retains visible editor");
+        host.Editor.Close();Pump();Check(host.Closing,"closing last window exits app instead of leaving a background process");
+        Check(!host.WakeScheduled && !host.AnimationScheduled && audio.Last is null,"last-window close stops wakeups, animations, and audio");
         host.Dispose();app.Shutdown();
     }
     private static void Capture(Window window,string path)

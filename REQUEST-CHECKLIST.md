@@ -4,6 +4,11 @@ See [CHANGELOG.md](CHANGELOG.md) for dated Dev/Prod changes between versions. Th
 
 ## Check the latest UI requests
 
+- [ ] Find the larger scheduled **Starts in** countdown directly above pause; confirm the old small countdown and redundant endpoint footer are gone.
+- [ ] See the countdown color progression across both focus and break portions of the timeline.
+- [ ] Confirm timer text, floating outline, and editor timer-panel perimeter change to the same color, with a thicker completed portion of the outline.
+- [ ] Close both windows in either order and verify no app process or tray icon remains; minimizing should keep the app open in the taskbar.
+
 - [ ] Edit either large focus/break duration and see related timeline times update on every valid keystroke, rounded to whole minutes; input stays intact while typing.
 - [ ] Edit start, focus end, and break end. Start and end times round to minutes; focus end adjusts focus and shifts break end, while break end adjusts break duration.
 - [ ] Enter a future start and see a pink start countdown on the bar, a scheduled status in the editor, and automatic focus at the chosen time.
@@ -20,8 +25,8 @@ See [CHANGELOG.md](CHANGELOG.md) for dated Dev/Prod changes between versions. Th
 - [ ] Observe download progress beside the disabled button if a newer release exists.
 - [ ] Confirm the same button becomes **Update and restart** only after a verified update has downloaded; a failed check returns to the check action.
 - [ ] Confirm there is no **Download installer**, **Quit app**, or **Done** button in the editor.
-- [ ] Close the editor with **X** or Escape; reopen it with the pencil or tray icon.
-- [ ] Quit the whole app using **Quit** in the tray or floating-bar menu.
+- [ ] Close the editor with **X** or Escape; reopen it with the pencil or relaunch while the bar is still open.
+- [ ] Quit the whole app using **Quit** in the floating-bar menu, or close the last visible window.
 
 ## Check the earlier app requests
 
@@ -40,7 +45,7 @@ See [CHANGELOG.md](CHANGELOG.md) for dated Dev/Prod changes between versions. Th
 
 - [ ] Launch from the desktop or installed app entry and confirm both the editor and always-on-top floating bar open.
 - [ ] Find both independent windows in the taskbar and Alt+Tab.
-- [ ] Close either window with **X** and confirm the other window and timer keep working.
+- [ ] Close either window with **X** and confirm the other stays available; then close the last window and confirm the process exits, audio stops, and no tray/hidden-icons entry remains.
 - [ ] Launch again and confirm hidden/minimized windows reopen without creating a second production instance.
 - [ ] Click the pencil to open the editor centered on the primary screen; the earlier expanding-bar/down-arrow editor was superseded by this separate window.
 - [ ] Toggle **Show floating bar** in the editor without closing or hiding the editor.
@@ -67,7 +72,7 @@ See [CHANGELOG.md](CHANGELOG.md) for dated Dev/Prod changes between versions. Th
 - [ ] Check the 60-minute preset reminders at 30, 10, and 5 minutes of focus remaining, corresponding to 60%, 20%, and 10% of focus duration.
 - [ ] Hear escalating, distinct reminder sounds assigned backward: the last reminder always uses the same strongest sound, the second-last uses the same rising sound, and the additional third-last uses the single softer beep.
 - [ ] Reach zero and confirm completion waits for acknowledgement and loops its alarm; any interaction on the bar silences audio, while play/skip also start the next section.
-- [ ] Hide the bar at completion and use the editor's acknowledgement button or tray controls.
+- [ ] Hide the bar at completion and use the editor's acknowledgement button controls.
 - [ ] Respect the Windows animation preference: when animations are disabled, the reminder warning stays still while audio and acknowledgement behavior remain active.
 - [ ] Resume after a delayed tick/sleep and confirm overdue reminders coalesce rather than playing in a queue.
 
@@ -89,7 +94,7 @@ See [CHANGELOG.md](CHANGELOG.md) for dated Dev/Prod changes between versions. Th
 - [ ] Confirm running visible countdowns/colors update each second, while reminder/completion flashes still animate.
 - [ ] Hide/minimize both windows and confirm reminders/completion continue without routine UI work; reopen and confirm the countdown catches up.
 - [ ] Resume Windows or change the system clock and confirm the engine/preview recover correctly.
-- [ ] Confirm the native tray icon, right-click actions, keyboard activation, update actions, and reopening both windows.
+- [ ] Confirm there is no tray icon, and bar right-click actions, keyboard activation, editor update actions, and reopening one hidden window still work.
 - [ ] Compare the measured results in `RESOURCE-AUDIT.md`; retain WPF as selected before considering a full native UI rewrite.
 
 ## Separate Focus and Break inputs — earlier proposal superseded

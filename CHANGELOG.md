@@ -8,6 +8,10 @@ See [the request checklist](REQUEST-CHECKLIST.md) for the complete feature revie
 
 ## [Unreleased]
 
+- Move the scheduled-start countdown above pause at twice the old label size and remove the redundant endpoint footer. Show the exact countdown color progression on both timeline phases.
+- Share a countdown-colored, thicker perimeter renderer between the floating bar and editor timer panel. Keep the whole outline in the timer’s current color and distinguish completed progress with a thicker stroke.
+- Remove app tray registration entirely. Closing one window retains the other; closing the last visible window disposes timers, audio, updates, and IPC and exits. This supersedes the earlier hide-both-and-keep-running behavior; minimized windows remain open. Verify 197 native and 27 updater assertions plus eight changelog assertions and updated UI captures. Verify actual Dev process exit after closing both windows in each order; the first window alone does not exit the app.
+
 - Replace the floating progress circle with a thicker perimeter progress outline; keep countdown at the left with play/pause, skip, and edit. Add a persisted vertical orientation button in the editor with upright countdown and stacked controls.
 - Build the requested session timeline with a larger focus duration, slightly smaller break duration, play/pause and skip between them, and editable start/focus-end/break-end fields. Apply valid edits per keystroke without overwriting input; show next-day labels separately and fit long durations in the narrow editor.
 - Schedule automatic future focus starts with a pink bar countdown and editor status; reject past starts with a red inline error and reset to now. Schedule the start deadline directly, catch up after sleep/clock changes, and keep completion acknowledgement and coalesced reminders.
