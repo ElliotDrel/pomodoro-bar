@@ -3,22 +3,24 @@ using System;
 namespace PomodoroBar.Core;
 
 public readonly record struct Rgb(byte R, byte G, byte B);
-public readonly record struct BarLayout(double Scale, double Left, double Top, double TimerWidth)
+public readonly record struct BarLayout(double Scale, double Left, double Top, double TimerWidth, bool Vertical = false)
 {
-    public double LogicalWidth => 32 + TimerWidth + 3 * 32 + 20;
-    public static BarLayout Fit(double width, double height, double textWidth)
+    public double LogicalWidth => Vertical ? Math.Max(100, TimerWidth + 16) : TimerWidth + 116;
+    public double LogicalHeight => Vertical ? 160 : 52;
+    public static BarLayout Fit(double width, double height, double textWidth, bool vertical = false)
     {
-        double logicalWidth = 32 + textWidth + 3 * 32 + 20;
-        double scale = Math.Min(width / logicalWidth, height / 52);
-        return new(scale, (width - logicalWidth * scale) / 2, (height - 52 * scale) / 2, textWidth);
+        double logicalWidth = vertical ? Math.Max(100,textWidth + 16) : textWidth + 116;
+        double logicalHeight = vertical ? 160 : 52;
+        double scale = Math.Min(width / logicalWidth, height / logicalHeight);
+        return new(scale, (width-logicalWidth*scale)/2, (height-logicalHeight*scale)/2,textWidth,vertical);
     }
     public int Hit(double x, double y)
     {
-        x = (x - Left) / Scale; y = (y - Top) / Scale;
-        if (y < 0 || y > 52 || x < 0 || x > LogicalWidth) return -1;
-        if (x < 40) return 0;
-        if (x < 40 + TimerWidth) return 1;
-        return Math.Min(4, 2 + (int)((x - 40 - TimerWidth) / 32));
+        x = (x-Left)/Scale; y = (y-Top)/Scale;
+        if (x < 0 || x > LogicalWidth || y < 0 || y > LogicalHeight) return -1;
+        if (Vertical) return y < 52 ? 1 : Math.Min(4,2+(int)((y-52)/36));
+        if (x < TimerWidth+12) return 1;
+        return Math.Min(4,2+(int)((x-TimerWidth-12)/32));
     }
 }
 

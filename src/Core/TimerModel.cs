@@ -9,6 +9,12 @@ public sealed class TimerModel
 {
     private readonly Func<double> clock;
     private double deadline;
+    private double? startDeadline;
+    private double scheduledDelay;
+    public bool Scheduled => startDeadline.HasValue;
+    public double StartRemaining => startDeadline is double start ? Math.Max(0, start - clock()) : 0;
+    public double StartProgress => Scheduled ? Math.Clamp(1 - StartRemaining / scheduledDelay, 0, 1) : 0;
+    public double SecondsToDeadline => deadline - clock();
     private readonly HashSet<double> fired = [];
     public double Focus { get; private set; }
     public double Rest { get; private set; }
@@ -24,6 +30,7 @@ public sealed class TimerModel
     // Schedule only the next unfired milestone. Deadlines remain authoritative after sleep.
     public double SecondsUntilNextEvent()
     {
+        if (Scheduled) return StartRemaining;
         if (!Running) return double.PositiveInfinity;
         double remaining = Math.Max(0, deadline - clock());
         double delay = remaining;
@@ -46,6 +53,9 @@ public sealed class TimerModel
     // One result per tick: completing takes precedence over every missed reminder.
     public string? Tick()
     {
+        if (startDeadline is double start && clock() >= start) {
+            startDeadline = null; Running = true; deadline = start + Remaining;
+        }
         if (!Running) return null;
         Remaining = Math.Max(0, deadline - clock());
         bool reminder = false;
@@ -58,6 +68,7 @@ public sealed class TimerModel
 
     public string? Toggle()
     {
+        if (Scheduled) { startDeadline = null; return null; }
         if (Waiting) { Advance(true); return null; }
         if (Running) { var sound = Tick(); Running = false; return sound; }
         else { deadline = clock() + Remaining; Running = true; }
@@ -66,6 +77,7 @@ public sealed class TimerModel
 
     public void Advance(bool? run = null)
     {
+        startDeadline = null;
         bool nextRun = run ?? (Running || Waiting);
         IsFocus = !IsFocus; Remaining = Duration; Waiting = false; fired.Clear();
         Running = nextRun; deadline = clock() + Remaining;
@@ -76,6 +88,42 @@ public sealed class TimerModel
         ValidateDuration(seconds);
         if (IsFocus) Focus = seconds; else Rest = seconds;
         Remaining = seconds; Waiting = false; fired.Clear(); deadline = clock() + seconds;
+    }
+
+    public void SetSectionTime(bool focus, double seconds)
+    {
+        ValidateDuration(seconds);
+        if (focus == IsFocus) SetTime(seconds);
+        else if (focus) Focus = seconds;
+        else Rest = seconds;
+    }
+
+    public void Schedule(double seconds)
+    {
+        if (!double.IsFinite(seconds) || seconds <= 0) throw new ArgumentException("Choose a future start time.");
+        IsFocus = true; Remaining = Focus; Running = false; Waiting = false; fired.Clear();
+        scheduledDelay = seconds; startDeadline = clock() + seconds;
+    }
+
+    public void RebaseScheduledStart(double seconds)
+    {
+        if (!Scheduled || !double.IsFinite(seconds)) return;
+        startDeadline = clock() + seconds;
+    }
+
+    public void SetEndpoint(bool focus,double seconds)
+    {
+        ValidateDuration(seconds);
+        if (focus != IsFocus) { SetSectionTime(focus,RoundDuration(seconds)); return; }
+        double elapsed = Math.Max(0,Duration - Remaining);
+        if (focus) Focus = RoundDuration(Math.Min(86400,elapsed+seconds)); else Rest = RoundDuration(Math.Min(86400,elapsed+seconds));
+        Remaining = seconds; Waiting = false; fired.Clear(); deadline = clock() + seconds;
+    }
+
+    public static double RoundDuration(double seconds)
+    {
+        ValidateDuration(seconds);
+        return Math.Clamp(Math.Floor(seconds / 60 + .5) * 60, 60, 86400);
     }
 
     public static void ValidateDuration(double seconds)

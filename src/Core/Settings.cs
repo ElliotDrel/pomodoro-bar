@@ -14,12 +14,13 @@ public sealed record Settings
     public double Height { get; init; } = 52;
     public double X { get; init; } = 80;
     public double Y { get; init; } = 80;
+    public bool Vertical { get; init; }
 
     public void Validate()
     {
         if (Thresholds is null) throw new ArgumentException("Missing reminder percentages.");
         _ = new TimerModel(Focus, Rest, Thresholds, () => 0);
-        if (!double.IsFinite(Width) || !double.IsFinite(Height) || Width < 130 || Width > 1000 || Height < 20 || Height > 120 || !double.IsFinite(X) || !double.IsFinite(Y))
+        if (!double.IsFinite(Width) || !double.IsFinite(Height) || Width < (Vertical ? 52 : 130) || Width > (Vertical ? 300 : 1000) || Height < (Vertical ? 130 : 20) || Height > (Vertical ? 1000 : 120) || !double.IsFinite(X) || !double.IsFinite(Y))
             throw new ArgumentException("Invalid window geometry.");
     }
 

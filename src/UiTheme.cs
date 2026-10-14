@@ -18,6 +18,8 @@ internal static class UiTheme
     internal static readonly SolidColorBrush Focus = Color("#96D3E4");
     internal static readonly SolidColorBrush Rest = Color("#A7DABB");
     internal static readonly SolidColorBrush Warning = Color("#FFAE66");
+    internal static readonly SolidColorBrush Scheduled = Color("#F1A7DA");
+    internal static readonly SolidColorBrush Error = Color("#FF667B");
     internal static Pen Pen(Brush brush, double width, bool round = false)
     {
         var pen = new Pen(brush,width);

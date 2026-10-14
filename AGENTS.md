@@ -9,9 +9,9 @@ Native C#/.NET 10 Windows app: WPF windows, direct Windows shell tray, Velopack 
 - One app and one desktop shortcut named Pomodoro Bar. Both independent windows appear in the taskbar and Alt+Tab; startup and relaunch show both. Do not suppress either window's taskbar presence.
 - Closing either window hides only that window. Quit alone exits the app; both windows can be reopened through tray/relaunch.
 
-- Uniformly scale circle, countdown, controls, and hit targets down to 130 × 20 DIPs.
-- Mirror the countdown in the editor without overwriting a draft.
-- Presets: 30 total = 25/5; 60 total = 50/10. Additions preserve 5:1 ratio and reminder percentages.
+- Use a thick progress outline instead of a circle. Uniformly scale countdown, controls, and hit targets down to 130 × 20 DIPs.
+- Mirror the active countdown in the editor without overwriting input. Apply valid duration/clock edits on each keystroke; round configured edits to minutes. Schedule future starts with a pink countdown, reject past starts with a red error and reset to now. Persist vertical bar orientation.
+- Presets: 30 total = 25/5; 60 total = 50/10. Additions preserve total minutes and reminder percentages with the nearest whole-minute 5:1 split; this supersedes exact fractional-minute additions.
 - Assign sounds backward; completion loops until a bar interaction silences audio. Completion waits for acknowledgement; coalesce delayed reminders.
 - Audio/update work must not block the dispatcher.
 - Schedule visible countdown seconds and hidden milestones directly; do not reintroduce unconditional polling. Keep paused rounded end previews live, skip hidden/minimized UI, and animate alerts only on the visible bar. Catch up on resume/time changes and preserve drafts.
@@ -24,9 +24,10 @@ Native C#/.NET 10 Windows app: WPF windows, direct Windows shell tray, Velopack 
 
 | Path | Purpose |
 | --- | --- |
-| src/Core/ | Deadline engine, parser, settings, safe startup recovery/migration, color/layout math |
-| src/BarWindow.cs | Floating drawing, hit targets, moving, native resizing |
-| src/EditorWindow.cs | Independent editor, protected time draft, live rounded end-time preview, and focus/break timeline |
+| src/Core/ | Deadline and scheduled-start engine, settings, recovery/migration, color/layout math |
+| src/Core/ClockTime.cs | Rounded editable clock parsing, explicit next-day dates, and end-time formatting |
+| src/BarWindow.cs | Horizontal/vertical floating countdown, perimeter progress, hit targets, moving, and native resizing |
+| src/EditorWindow.cs | Editable focus/break durations, scheduled start and timeline endpoints, play/skip, and orientation controls |
 | src/UiTheme.cs | Shared palette, keyboard-focus button/switch templates, and menu styling |
 | src/AppIcon.cs | Shared embedded window/taskbar icon and owned native tray icon handles |
 | src/NativeTray.cs | Windows shell tray registration, native menus, keyboard activation, Explorer recovery and icon cleanup |

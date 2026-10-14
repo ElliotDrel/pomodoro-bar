@@ -8,6 +8,13 @@ See [the request checklist](REQUEST-CHECKLIST.md) for the complete feature revie
 
 ## [Unreleased]
 
+- Replace the floating progress circle with a thicker perimeter progress outline; keep countdown at the left with play/pause, skip, and edit. Add a persisted vertical orientation button in the editor with upright countdown and stacked controls.
+- Build the requested session timeline with a larger focus duration, slightly smaller break duration, play/pause and skip between them, and editable start/focus-end/break-end fields. Apply valid edits per keystroke without overwriting input; show next-day labels separately and fit long durations in the narrow editor.
+- Schedule automatic future focus starts with a pink bar countdown and editor status; reject past starts with a red inline error and reset to now. Schedule the start deadline directly, catch up after sleep/clock changes, and keep completion acknowledgement and coalesced reminders.
+- Round edited durations and clock times to minutes, with exact selected endpoint deadlines. Presets/additions keep their total and reminder percentages using a whole-minute approximation of 5:1, superseding fractional-minute additions; 30 + 1 now yields 26/5. Preserve independent windows, channel-isolated settings, and Dev's disabled auto-update policy.
+- Add native scheduling, live editing, past-start correction, date parsing, orientation persistence, and hit-target regressions plus normal/scheduled/vertical/narrow layout captures. Update the README, file map, and request checklist; no production release or remote push in this local Dev review.
+- Verify 195 native assertions, 27 updater assertions, eight changelog assertions, Dev/Release builds, and layout captures. NuGet vulnerability-feed lookup was unavailable (`NU1900`); compilation and tests passed using the existing dependencies.
+
 - Improve GitHub discovery with a clear product description, Windows/productivity topics, and a working download website link. Add direct install, release, support, and measurement links plus a concise user overview to the README. Documentation only; the app binary is unchanged.
 
 ## [1.1.6] - 2026-10-11

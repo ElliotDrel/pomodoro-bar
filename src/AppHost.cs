@@ -21,6 +21,15 @@ internal sealed class AppHost : IDisposable
     private readonly Func<double> clock;
     private readonly Func<DateTimeOffset> wallClock;
     internal DateTimeOffset Now => wallClock();
+    internal DateTimeOffset? ScheduledStart { get; private set; }
+    internal DateTimeOffset? SectionStart { get; private set; }
+    internal DateTimeOffset? SessionStart { get; private set; }
+    private DateTimeOffset? focusCompletedAt;
+    internal DateTimeOffset PreviewStart => ScheduledStart ?? (Timer.Running || Timer.Waiting || !Timer.IsFocus ? SessionStart ?? Now : Now);
+    internal DateTimeOffset FocusEnd => Timer.IsFocus
+        ? TimerModel.EstimatedEnd(Timer.Scheduled ? PreviewStart : Now, Timer.Waiting ? Timer.SecondsToDeadline : Timer.Remaining)
+        : TimerModel.EstimatedEnd(focusCompletedAt ?? SectionStart ?? Now, 0);
+    internal DateTimeOffset BreakEnd => Timer.IsFocus ? FocusEnd.AddSeconds(Timer.Rest) : TimerModel.EstimatedEnd(Now,Timer.Waiting ? Timer.SecondsToDeadline : Timer.Remaining);
     private readonly IAudio audio;
     private readonly DispatcherTimer tick, save, animation;
     private readonly NativeTray? tray;
@@ -29,7 +38,7 @@ internal sealed class AppHost : IDisposable
     private bool disposed;
     private bool sessionTouched;
     private bool restarting;
-    public bool CanAutoRestart => !sessionTouched && !Timer.Running && !Timer.Waiting && !Editor.Editing;
+    public bool CanAutoRestart => !sessionTouched && !Timer.Running && !Timer.Waiting && !Timer.Scheduled && !Editor.Editing;
 
     public AppHost(Settings settings, string? settingsPath, IAudio audio, Func<double>? clock = null, bool services = true, bool smoke = false, UpdateTrigger startupTrigger = UpdateTrigger.Launch, Func<DateTimeOffset>? wallClock = null)
     {
@@ -87,7 +96,10 @@ internal sealed class AppHost : IDisposable
     {
         if (Closing) return;
         tick.Stop();
+        bool scheduled = Timer.Scheduled;
         string? sound = Timer.Tick();
+        if (scheduled && !Timer.Scheduled) { SectionStart = SessionStart = ScheduledStart; ScheduledStart = null; }
+        if (sound == "complete" && Timer.IsFocus) focusCompletedAt = FocusEnd;
         PlayEvent(sound);
         Render();
     }
@@ -100,17 +112,27 @@ internal sealed class AppHost : IDisposable
         }
     }
     public void Silence() => audio.Stop();
-    public void Toggle() { sessionTouched = true; Silence(); pulseUntil = 0; PlayEvent(Timer.Toggle()); Render(); }
-    public void Acknowledge() { sessionTouched = true; Silence(); if (Timer.Waiting) Timer.Advance(true); pulseUntil = 0; Render(); }
-    public void Skip() { sessionTouched = true; Silence(); Timer.Advance(); pulseUntil = 0; Render(); }
+    public void Toggle() {
+        if (Timer.Waiting) { Acknowledge(); return; }
+        sessionTouched = true; Silence(); pulseUntil = 0;
+        if (!Timer.Running && !Timer.Scheduled) {
+            SectionStart = Now.AddSeconds(-(Timer.Duration - Timer.Remaining));
+            if (Timer.IsFocus && SessionStart is null) SessionStart = SectionStart;
+        }
+        PlayEvent(Timer.Toggle()); ScheduledStart = null; Render();
+    }
+    public void Acknowledge() { sessionTouched = true; Silence(); if (Timer.Waiting) { Timer.Advance(true); SectionStart = Now; if (Timer.IsFocus) SessionStart = Now; } pulseUntil = 0; Render(); }
+    public void Skip() { sessionTouched = true; Silence(); if (Timer.IsFocus) focusCompletedAt = Now; Timer.Advance(); ScheduledStart = null; SectionStart = Now; if (Timer.IsFocus) SessionStart = Now; pulseUntil = 0; Render(); }
     public void Reset()
     {
-        sessionTouched = true; Silence(); Timer = new TimerModel(Settings.Focus,Settings.Rest,Settings.Thresholds,clock); pulseUntil = 0; Render();
+        sessionTouched = true; Silence(); ScheduledStart = null; SectionStart = SessionStart = focusCompletedAt = null; Timer = new TimerModel(Settings.Focus,Settings.Rest,Settings.Thresholds,clock); pulseUntil = 0; Render();
     }
     public void SetSession(double minutes,double[] thresholds)
     {
         if (minutes > 1440) { Editor.Note("Maximum session length is 24 hours."); return; }
-        Editor.CancelEdit(); Settings = Settings with { Focus = minutes*50, Rest = minutes*10, Thresholds = thresholds };
+        double total = Math.Max(120,Math.Floor(minutes+.5)*60);
+        double focus = Math.Min(total-60,TimerModel.RoundDuration(total*5/6));
+        Editor.CancelEdit(); Settings = Settings with { Focus = focus, Rest = total-focus, Thresholds = thresholds };
         Reset(); Save(); Editor.Note("Time set. Press play on the bar to begin.");
     }
     public void AddMinutes(int minutes) => SetSession((Timer.Focus+Timer.Rest)/60+minutes,Timer.Thresholds);
@@ -118,6 +140,42 @@ internal sealed class AppHost : IDisposable
     {
         sessionTouched = true; Timer.SetTime(seconds); Silence(); pulseUntil = 0;
         Settings = Settings with { Focus = Timer.Focus, Rest = Timer.Rest }; Save(); Render();
+    }
+    internal void SetDuration(bool focus,double seconds)
+    {
+        sessionTouched = true; Timer.SetSectionTime(focus,TimerModel.RoundDuration(seconds)); Silence(); pulseUntil = 0;
+        if (focus == Timer.IsFocus && Timer.Running) SectionStart = Now;
+        Settings = Settings with { Focus = Timer.Focus, Rest = Timer.Rest }; ScheduleSave(); Render();
+    }
+    internal bool SetStart(DateTimeOffset start)
+    {
+        sessionTouched = true; Silence();
+        focusCompletedAt = null;
+        var now = Now;
+        bool past = start < now && start != TimerModel.EstimatedEnd(now,0);
+        if (past || start <= TimerModel.EstimatedEnd(now,0)) {
+            Timer = new TimerModel(Timer.Focus,Timer.Rest,Timer.Thresholds,clock);
+            ScheduledStart = null; SectionStart = SessionStart = null;
+        } else {
+            ScheduledStart = start; SectionStart = SessionStart = null; Timer.Schedule((start-now).TotalSeconds);
+        }
+        Render(); return !past;
+    }
+    internal void SetFocusEnd(DateTimeOffset end)
+    {
+        double remaining = (end - (!Timer.IsFocus ? PreviewStart : Timer.Scheduled ? PreviewStart : Now)).TotalSeconds;
+        ApplyEndpoint(true,remaining);
+        if (!Timer.IsFocus) { focusCompletedAt = end; Render(); }
+    }
+    internal void SetBreakEnd(DateTimeOffset end)
+    {
+        double seconds = (end - (Timer.IsFocus ? FocusEnd : Now)).TotalSeconds;
+        ApplyEndpoint(false,seconds);
+    }
+    private void ApplyEndpoint(bool focus,double seconds)
+    {
+        Timer.SetEndpoint(focus,seconds); sessionTouched = true; Silence(); pulseUntil = 0;
+        Settings = Settings with { Focus = Timer.Focus, Rest = Timer.Rest }; ScheduleSave(); Render();
     }
     private static bool Visible(Window? window) => window is not null && window.IsVisible && window.WindowState != WindowState.Minimized;
     internal bool WakeScheduled => tick.IsEnabled;
@@ -137,8 +195,9 @@ internal sealed class AppHost : IDisposable
         if (Closing) return;
         tick.Stop();
         double seconds = Timer.SecondsUntilNextEvent();
-        if (Timer.Running && (Visible(Bar) || Visible(Editor))) {
-            double fraction = Timer.Remaining - Math.Floor(Timer.Remaining);
+        if ((Timer.Running || Timer.Scheduled) && (Visible(Bar) || Visible(Editor))) {
+            double display = Timer.Scheduled ? Timer.StartRemaining : Timer.Remaining;
+            double fraction = display - Math.Floor(display);
             seconds = Math.Min(seconds, fraction > .001 ? fraction : 1);
         }
         if (Visible(Editor)) seconds = Math.Min(seconds, Editor.SecondsUntilPreviewChange());
@@ -152,7 +211,14 @@ internal sealed class AppHost : IDisposable
     private void TimeChanged(object? sender, EventArgs e) => QueueClockRefresh();
     private void QueueClockRefresh()
     {
-        if (!Closing) Application.Current.Dispatcher.BeginInvoke(() => { if (!Closing) Tick(); });
+        if (!Closing) Application.Current.Dispatcher.BeginInvoke(() => {
+            if (Closing) return;
+            if (ScheduledStart is DateTimeOffset start) {
+                double delay = (start-Now).TotalSeconds;
+                Timer.RebaseScheduledStart(delay);
+            }
+            Tick();
+        });
     }
     public void ShowApp()
     {
@@ -179,7 +245,7 @@ internal sealed class AppHost : IDisposable
     public bool Save()
     {
         if (settingsPath is null) return true;
-        Settings = Settings with { Width = Bar.Width, Height = Bar.Height, X = Bar.Left, Y = Bar.Top };
+        Settings = Settings with { Width = Bar.Width, Height = Bar.Height, X = Bar.Left, Y = Bar.Top, Vertical = Bar.Vertical };
         try { Settings.Save(settingsPath); return true; }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) {
             Log.Write("settings_save_failed " + ex.Message); Report("Could not save settings: " + ex.Message); return false;

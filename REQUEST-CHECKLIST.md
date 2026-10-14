@@ -4,7 +4,13 @@ See [CHANGELOG.md](CHANGELOG.md) for dated Dev/Prod changes between versions. Th
 
 ## Check the latest UI requests
 
-- [ ] Edit the countdown and watch the end time update immediately, rounded to the nearest minute. Paused timers show an estimate if started now; running unsaved drafts show an estimate if saved now; next-day times say tomorrow or show the date.
+- [ ] Edit either large focus/break duration and see related timeline times update on every valid keystroke, rounded to whole minutes; input stays intact while typing.
+- [ ] Edit start, focus end, and break end. Start and end times round to minutes; focus end adjusts focus and shifts break end, while break end adjusts break duration.
+- [ ] Enter a future start and see a pink start countdown on the bar, a scheduled status in the editor, and automatic focus at the chosen time.
+- [ ] Enter a past start and see a red error beside the timeline with the start reset to now.
+- [ ] Sleep across a scheduled start and verify elapsed focus time catches up, with completion still requiring acknowledgement.
+- [ ] Find play/pause and skip between the larger focus duration and slightly smaller break duration.
+- [ ] Switch the floating bar to vertical in the editor, then reopen the app and confirm orientation persists.
 - [ ] Check, download, install, and restart without a terminal appearing; progress stays in the editor.
 - [ ] Confirm one Pomodoro Bar Desktop shortcut, one Start Menu shortcut, and identical executable/icon targets; app search should no longer see the native executable and root launcher as separate entries.
 - [ ] Inspect the editor and bar for the new stopwatch-inspired design, readable text, and matching controls.
@@ -38,16 +44,16 @@ See [CHANGELOG.md](CHANGELOG.md) for dated Dev/Prod changes between versions. Th
 - [ ] Launch again and confirm hidden/minimized windows reopen without creating a second production instance.
 - [ ] Click the pencil to open the editor centered on the primary screen; the earlier expanding-bar/down-arrow editor was superseded by this separate window.
 - [ ] Toggle **Show floating bar** in the editor without closing or hiding the editor.
-- [ ] Edit the large formatted countdown directly; enter minutes, `MM:SS`, or `HH:MM:SS`, then press Enter to save or Escape to cancel.
-- [ ] Keep an unsaved draft while the timer runs and confirm live countdown updates do not overwrite it.
+- [ ] Edit the large formatted countdown directly; enter minutes, `MM:SS`, or `HH:MM:SS`; valid input applies live, and Enter/Escape finish editing.
+- [ ] Keep typed input intact while the timer runs and confirm live countdown updates do not overwrite it.
 
 ### Floating bar and sizing
 
-- [ ] Find the cycle-progress circle, current countdown, play/pause, skip, and pencil on the compact bar.
-- [ ] Confirm the progress circle measures the whole focus-plus-break cycle.
+- [ ] Find the thick perimeter progress outline, left-hand countdown, play/pause, skip, and pencil on the compact bar.
+- [ ] Confirm the progress outline measures the whole focus-plus-break cycle.
 - [ ] Inspect the tight spacing between the countdown and play button.
 - [ ] Enable **Resize using the bar’s edges**, then drag native window edges/corners to resize the bar.
-- [ ] Shrink the bar to `130 × 20` DIPs and confirm the circle, digits, buttons, and hit targets scale together.
+- [ ] Shrink the bar to `130 × 20` DIPs and confirm the outline, digits, buttons, and hit targets scale together.
 - [ ] Click **Reset size** and confirm the bar returns to `280 × 52` DIPs without changing its position or timer.
 - [ ] Confirm appearance is automatic; there are no color-picker settings, as requested after the initial customization proposal.
 
@@ -55,12 +61,12 @@ See [CHANGELOG.md](CHANGELOG.md) for dated Dev/Prod changes between versions. Th
 
 - [ ] Select **30 minutes** and confirm `25:00` focus plus `05:00` break.
 - [ ] Select **60 minutes** and confirm `50:00` focus plus `10:00` break.
-- [ ] Use `+1`, `+5`, or `+10` minutes and confirm the total increases; these current preset/addition controls use the original `5:1` focus/break split.
+- [ ] Use `+1`, `+5`, or `+10` minutes and confirm the total increases; these controls approximate the original `5:1` split in whole minutes while preserving total minutes.
 - [ ] Watch countdown colors change continuously from white through green, yellow, orange, and red as time runs low.
 - [ ] Check the 30-minute preset reminders at 10 and 5 minutes of focus remaining, corresponding to 40% and 20% of focus duration.
 - [ ] Check the 60-minute preset reminders at 30, 10, and 5 minutes of focus remaining, corresponding to 60%, 20%, and 10% of focus duration.
 - [ ] Hear escalating, distinct reminder sounds assigned backward: the last reminder always uses the same strongest sound, the second-last uses the same rising sound, and the additional third-last uses the single softer beep.
-- [ ] Reach zero and confirm completion waits for acknowledgement and loops its alarm; any interaction on the bar silences audio, while circle/play/skip also start the next section.
+- [ ] Reach zero and confirm completion waits for acknowledgement and loops its alarm; any interaction on the bar silences audio, while play/skip also start the next section.
 - [ ] Hide the bar at completion and use the editor's acknowledgement button or tray controls.
 - [ ] Respect the Windows animation preference: when animations are disabled, the reminder warning stays still while audio and acknowledgement behavior remain active.
 - [ ] Resume after a delayed tick/sleep and confirm overdue reminders coalesce rather than playing in a queue.
@@ -86,10 +92,8 @@ See [CHANGELOG.md](CHANGELOG.md) for dated Dev/Prod changes between versions. Th
 - [ ] Confirm the native tray icon, right-click actions, keyboard activation, update actions, and reopening both windows.
 - [ ] Compare the measured results in `RESOURCE-AUDIT.md`; retain WPF as selected before considering a full native UI rewrite.
 
-## Proposed next change: separate Focus and Break inputs
+## Separate Focus and Break inputs — earlier proposal superseded
 
-- Present two editable durations together: **Focus `25 min`** and **Break `5 min`**.
-- Change the ratio by editing either duration; set **Focus `23 min`** and **Break `7 min`** for the example requested.
-- Keep the live countdown distinct from the configured durations so new users know what each number does.
-- Let presets set both durations, and let additions preserve the chosen ratio once this feature is implemented.
-- Mark this proposal as **not implemented**: the current countdown editor changes the active section, and preset/addition buttons still apply the original `5:1` split.
+- [ ] Verify both durations can be independently edited, including 23 minutes focus / 7 minutes break. This is now implemented by the timeline editor.
+- [ ] Verify the active section counts down while the other field shows its configured duration.
+- Pending earlier proposal: preserve a manually chosen ratio when using additions. Current additions intentionally approximate the original 5:1 split in whole minutes; the latest request did not change this policy.
