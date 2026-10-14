@@ -25,7 +25,13 @@ internal static class UpdateFlowTests
         File.WriteAllText(probeScript,"Add-Type -MemberDefinition '[System.Runtime.InteropServices.DllImport(\"kernel32.dll\")] public static extern System.IntPtr GetConsoleWindow();' -Name ConsoleProbe -Namespace Probe; [IO.File]::WriteAllText('"+probe.Replace("'","''")+"',[Probe.ConsoleProbe]::GetConsoleWindow().ToInt64().ToString())");
         var powershell=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),"WindowsPowerShell","v1.0","powershell.exe");
         using(var child=System.Diagnostics.Process.Start(BackgroundUpdateProcess.StartInfo(powershell,["-NoProfile","-NonInteractive","-File",probeScript],directory))!) {
-            if(!child.WaitForExit(15000)){child.Kill();throw new Exception("console probe timed out");}
+            // Cold Windows CI can spend more than 15 seconds compiling the probe's Add-Type.
+            // Always reap a timed-out child before the caller removes its working directory.
+            if(!child.WaitForExit(60000)) {
+                child.Kill(entireProcessTree:true);
+                if(!child.WaitForExit(10000)) throw new Exception("console probe did not exit after termination");
+                throw new Exception("console probe timed out after 60 seconds");
+            }
             Check(child.ExitCode==0 && File.ReadAllText(probe)=="0","real background helper has no console window");
         }
         var locator=new RecordingLocator(directory);

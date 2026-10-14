@@ -8,9 +8,11 @@ See [the request checklist](REQUEST-CHECKLIST.md) for the complete feature revie
 
 ## [Unreleased]
 
-## [1.2.0] - 2026-10-14
+## [1.2.1] - 2026-10-14
 
-Channel: Prod. [Release](https://github.com/ElliotDrel/pomodoro-bar/releases/tag/v1.2.0).
+Channel: Prod. [Release](https://github.com/ElliotDrel/pomodoro-bar/releases/tag/v1.2.1).
+
+- Allow 60 seconds for cold Windows CI to compile the real console-window probe, and wait for any timed-out child to exit before deleting its working directory. This fixes the release test cleanup failure without changing app behavior.
 
 - Match floating-button click targets to their visible bounds in horizontal, tiny, and vertical layouts. Keep adjacent space draggable without invoking controls; releasing outside the pressed button cancels the action.
 
@@ -31,6 +33,12 @@ Channel: Prod. [Release](https://github.com/ElliotDrel/pomodoro-bar/releases/tag
 - Verify 195 native assertions, 27 updater assertions, eight changelog assertions, Dev/Release builds, and layout captures. NuGet vulnerability-feed lookup was unavailable (`NU1900`); compilation and tests passed using the existing dependencies.
 
 - Improve GitHub discovery with a clear product description, Windows/productivity topics, and a working download website link. Add direct install, release, support, and measurement links plus a concise user overview to the README. Documentation only; the app binary is unchanged.
+
+## [1.2.0] - 2026-10-14
+
+Channel: Unpublished release attempt.
+
+- Preserve the immutable v1.2.0 tag; its CI run failed during temporary updater-test cleanup and uploaded no public release. Superseded by 1.2.1 with the console-probe timeout and termination fix.
 
 ## [1.1.6] - 2026-10-11
 
