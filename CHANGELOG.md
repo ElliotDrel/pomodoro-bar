@@ -8,6 +8,10 @@ See [the request checklist](REQUEST-CHECKLIST.md) for the complete feature revie
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-16
+
+Channel: Prod. [Release](https://github.com/ElliotDrel/pomodoro-bar/releases/tag/v1.3.0).
+
 - Simplify ordered time edits to the two start/duration/end relationships, replacing the general matrix solver, duplicate value dictionaries, and numeric array positions. Apply each edit as one controller update with one save schedule and UI refresh; remove redundant reset calls and endpoint wrappers. Preserve the eight-second priority behavior, custom durations, compact clock input, and custom-ratio additions.
 - Remove the background verifier's 20 ms desktop polling loop and unused native interop. Keep a private non-input desktop, startup/exit isolation checks, native window-ownership assertions, and failure without visible fallback. Resource comparisons must use matching desktop modes and this polling-free verifier.
 
