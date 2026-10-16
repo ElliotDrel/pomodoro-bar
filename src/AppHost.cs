@@ -108,21 +108,29 @@ internal sealed class AppHost : IDisposable
         }
         PlayEvent(Timer.Toggle()); ScheduledStart = null; Render();
     }
-    public void Acknowledge() { sessionTouched = true; Silence(); if (Timer.Waiting) { Timer.Advance(true); SectionStart = Now; if (Timer.IsFocus) SessionStart = Now; } pulseUntil = 0; Render(); }
-    public void Skip() { sessionTouched = true; Silence(); if (Timer.IsFocus) focusCompletedAt = Now; Timer.Advance(); ScheduledStart = null; SectionStart = Now; if (Timer.IsFocus) SessionStart = Now; pulseUntil = 0; Render(); }
+    public void Acknowledge() { Editor.EndEditSession(); sessionTouched = true; Silence(); if (Timer.Waiting) { Timer.Advance(true); SectionStart = Now; if (Timer.IsFocus) SessionStart = Now; } pulseUntil = 0; Render(); }
+    public void Skip() { Editor.EndEditSession(); sessionTouched = true; Silence(); if (Timer.IsFocus) focusCompletedAt = Now; Timer.Advance(); ScheduledStart = null; SectionStart = Now; if (Timer.IsFocus) SessionStart = Now; pulseUntil = 0; Render(); }
     public void Reset()
     {
-        sessionTouched = true; Silence(); ScheduledStart = null; SectionStart = SessionStart = focusCompletedAt = null; Timer = new TimerModel(Settings.Focus,Settings.Rest,Settings.Thresholds,clock); pulseUntil = 0; Render();
+        Editor.EndEditSession(); sessionTouched = true; Silence(); ScheduledStart = null; SectionStart = SessionStart = focusCompletedAt = null; Timer = new TimerModel(Settings.Focus,Settings.Rest,Settings.Thresholds,clock); pulseUntil = 0; Render();
     }
     public void SetSession(double minutes,double[] thresholds)
     {
         if (minutes > 1440) { Editor.Note("Maximum session length is 24 hours."); return; }
         double total = Math.Max(120,Math.Floor(minutes+.5)*60);
         double focus = Math.Min(total-60,TimerModel.RoundDuration(total*5/6));
-        Editor.CancelEdit(); Settings = Settings with { Focus = focus, Rest = total-focus, Thresholds = thresholds };
+        Editor.EndEditSession(); Settings = Settings with { Focus = focus, Rest = total-focus, Thresholds = thresholds };
         Reset(); Save(); Editor.Note("Time set. Press play on the bar to begin.");
     }
-    public void AddMinutes(int minutes) => SetSession((Timer.Focus+Timer.Rest)/60+minutes,Timer.Thresholds);
+    public void AddMinutes(int minutes)
+    {
+        double total = Timer.Focus + Timer.Rest + minutes*60;
+        if (total > 86400) { Editor.Note("Maximum session length is 24 hours."); return; }
+        double focus = Math.Clamp(TimerModel.RoundDuration(total*Timer.Focus/(Timer.Focus+Timer.Rest)),60,total-60);
+        Editor.EndEditSession();
+        Settings = Settings with { Focus = focus, Rest = total-focus };
+        Reset(); Save(); Editor.Note("Time added, preserving your focus/break ratio to whole minutes.");
+    }
     public void SetTime(double seconds)
     {
         sessionTouched = true; Timer.SetTime(seconds); Silence(); pulseUntil = 0;
@@ -134,6 +142,41 @@ internal sealed class AppHost : IDisposable
         if (focus == Timer.IsFocus && Timer.Running) SectionStart = Now;
         Settings = Settings with { Focus = Timer.Focus, Rest = Timer.Rest }; ScheduleSave(); Render();
     }
+    internal void EditTime(EditOrder order,TimeField field,double value)
+    {
+        var now = Now;
+        // During focus, duration means remaining focus; during break it means remaining break.
+        var origin = Timer.IsFocus ? (Timer.Scheduled ? PreviewStart : now) : FocusEnd.AddSeconds(-Timer.Focus);
+        double focus = Timer.IsFocus ? Timer.Remaining : Timer.Focus;
+        double rest = Timer.IsFocus ? Timer.Rest : (BreakEnd-FocusEnd).TotalSeconds;
+        // The break field displays remaining time; the timeline includes elapsed break time.
+        if (!Timer.IsFocus && field == TimeField.Break) value += (now-FocusEnd).TotalSeconds;
+        var reference = DateTimeOffset.UnixEpoch;
+        double[] current = [(origin-reference).TotalSeconds,focus,rest];
+        var result = order.Apply(field,value,current,clock());
+        var start = reference.AddSeconds(result[0]).ToOffset(now.Offset);
+        var focusEnd = start.AddSeconds(result[1]);
+        var breakEnd = focusEnd.AddSeconds(result[2]);
+        if (Timer.IsFocus && start < now.AddSeconds(-.01) && Math.Abs(result[0]-current[0]) > .01)
+            throw new ArgumentException("Keeping earlier edits would put the start in the past. Shorten the duration or wait 8 seconds.");
+        if ((Timer.IsFocus ? focusEnd : breakEnd) <= now)
+            throw new ArgumentException("The active end time must be in the future.");
+        TimerModel.ValidateDuration(Timer.IsFocus && start > now ? result[1] : (Timer.IsFocus ? focusEnd : breakEnd).Subtract(now).TotalSeconds);
+        if (Timer.IsFocus) {
+            bool movedStart = Math.Abs(result[0]-current[0]) > .01;
+            if (movedStart) SetStart(start);
+            if (field == TimeField.Focus) SetDuration(true,result[1]);
+            else if (movedStart || Math.Abs(result[1]-current[1]) > .01) SetFocusEnd(focusEnd);
+            if (Math.Abs(result[2]-current[2]) > .01) SetDuration(false,result[2]);
+        } else {
+            if (Math.Abs(result[1]-current[1]) > .01) SetDuration(true,result[1]);
+            focusCompletedAt = focusEnd;
+            if (field == TimeField.Break) SetDuration(false,(breakEnd-now).TotalSeconds); else SetBreakEnd(breakEnd);
+        }
+        order.Accept(clock());
+    }
+    internal double EditClockSeconds(DateTimeOffset value) => (value-DateTimeOffset.UnixEpoch).TotalSeconds;
+    internal double EditSeconds => clock();
     internal bool SetStart(DateTimeOffset start)
     {
         sessionTouched = true; Silence();

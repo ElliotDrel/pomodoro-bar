@@ -31,6 +31,8 @@ internal sealed class EditorWindow : Window
     internal readonly Button UpdateButton;
     private bool updateReady;
     private bool editing, dirty, syncing;
+    private readonly EditOrder editOrder = new();
+    private readonly TextBlock editStatus;
 
     internal int SyncCount { get; private set; }
     internal bool Editing => editing;
@@ -91,6 +93,8 @@ internal sealed class EditorWindow : Window
         var focusEndPanel = Endpoint("Focus ends",FocusEndCard,HorizontalAlignment.Right); focusEndPanel.Margin = new Thickness(0,0,10,0); milestoneGrid.Children.Add(focusEndPanel);
         var breakEndPanel = Endpoint("Break ends",BreakEndCard,HorizontalAlignment.Right); Grid.SetColumn(breakEndPanel,1); milestoneGrid.Children.Add(breakEndPanel);
         card.Children.Add(milestoneGrid);
+        editStatus = UiTheme.Text("Edit any time. Your first edit stays fixed for 8 seconds after your latest change.",12,ink:UiTheme.Muted);
+        editStatus.TextWrapping = TextWrapping.Wrap; editStatus.Margin = new Thickness(0,8,0,0); card.Children.Add(editStatus);
         inputError = UiTheme.Text("",12,ink:UiTheme.Error); inputError.Visibility = Visibility.Collapsed;
         inputError.Margin = new Thickness(0,8,0,0); card.Children.Add(inputError);
         TimerPanel = new TimerPanel { Child = card, Padding = new Thickness(18,16,18,16), Background = UiTheme.Surface, CornerRadius = new CornerRadius(14) };
@@ -127,17 +131,18 @@ internal sealed class EditorWindow : Window
         update = UiTheme.Text($"Version {BuildChannel.Version}",11,ink:UiTheme.Muted); update.Margin = new Thickness(14,0,0,0);
         update.VerticalAlignment = VerticalAlignment.Center; updateRow.Children.Add(update); panel.Children.Add(updateRow);
         note = UiTheme.Text("Set your time, then press play on the bar.",12,ink:UiTheme.Muted); note.Margin = new Thickness(0,14,0,8); panel.Children.Add(note);
-        Bind(TimeCard,() => host.SetDuration(true,TimerModel.ParseTime(TimeCard.Text)));
-        Bind(BreakCard,() => host.SetDuration(false,TimerModel.ParseTime(BreakCard.Text)));
+        Bind(TimeCard,() => host.EditTime(editOrder,TimeField.Focus,TimerModel.RoundDuration(TimerModel.ParseTime(TimeCard.Text))));
+        Bind(BreakCard,() => host.EditTime(editOrder,TimeField.Break,TimerModel.RoundDuration(TimerModel.ParseTime(BreakCard.Text))));
         Bind(StartTimeCard,() => {
             var start = ClockTime.Parse(StartTimeCard.Text,host.PreviewStart,host.Now);
-            if (!host.SetStart(start)) {
+            if (start < host.Now && start != TimerModel.EstimatedEnd(host.Now,0)) {
+                EndEditSession(); host.SetStart(start);
                 syncing = true; StartTimeCard.Text = TimerModel.EstimatedEnd(host.Now,0).ToString("t"); syncing = false;
                 Error("Start time cannot be in the past. Reset to now.");
-            }
+            } else host.EditTime(editOrder,TimeField.Start,host.EditClockSeconds(start < host.Now ? host.Now : start));
         });
-        Bind(FocusEndCard,() => host.SetFocusEnd(ClockTime.Parse(FocusEndCard.Text,host.FocusEnd,host.Now)));
-        Bind(BreakEndCard,() => host.SetBreakEnd(ClockTime.Parse(BreakEndCard.Text,host.BreakEnd,host.Now)));
+        Bind(FocusEndCard,() => host.EditTime(editOrder,TimeField.FocusEnd,host.EditClockSeconds(ClockTime.Parse(FocusEndCard.Text,host.FocusEnd,host.Now))));
+        Bind(BreakEndCard,() => host.EditTime(editOrder,TimeField.BreakEnd,host.EditClockSeconds(ClockTime.Parse(BreakEndCard.Text,host.BreakEnd,host.Now))));
         PreviewKeyDown += (_,e) => { if (e.Key == Key.Escape && !editing) { CloseEditor(); e.Handled = true; } };
         Closing += (_,e) => { if (!host.Closing) { e.Cancel = true; CloseEditor(); } };
         Sync();
@@ -176,7 +181,7 @@ internal sealed class EditorWindow : Window
             dirty = true;
             try { validDraft = true; Note("Changes update as you type; durations round to the nearest minute."); apply(); }
             catch (ArgumentException ex) { validDraft = false; Error(ex.Message); }
-            host.ScheduleWake();
+            UpdateEditStatus(); host.ScheduleWake();
         };
         field.LostKeyboardFocus += (_,_) => { field.BorderBrush = UiTheme.Line; CancelEdit(); };
         field.PreviewKeyDown += (_,e) => {
@@ -185,11 +190,20 @@ internal sealed class EditorWindow : Window
         };
     }
     internal void CancelEdit() { editing = false; dirty = false; activeField = null; validDraft = true; Sync(); host.ScheduleWake(); }
+    internal void EndEditSession() { editOrder.Clear(); CancelEdit(); }
+    private void UpdateEditStatus()
+    {
+        if (editStatus is null) return;
+        double left = editOrder.SecondsLeft(host.EditSeconds);
+        editStatus.Text = left > 0 ? $"Edit order: {editOrder.Description}. Unlocks in {Math.Ceiling(left):0}s."
+            : "Edit any time. Your first edit stays fixed for 8 seconds after your latest change.";
+    }
     internal bool FinishEdit() { if (dirty && !validDraft) return false; CancelEdit(); return true; }
     internal void Error(string text) { note.Text = text; note.Foreground = UiTheme.Error; inputError.Text = text; inputError.Visibility = Visibility.Visible; }
     internal void Sync()
     {
         SyncCount++;
+        UpdateEditStatus();
         var t = host.Timer;
         void Set(TextBox field,string value) {
             if (activeField == field || field.Text == value) return;
@@ -227,12 +241,13 @@ internal sealed class EditorWindow : Window
     internal double SecondsUntilPreviewChange()
     {
         var t = host.Timer;
-        if (t.Running || t.Waiting || t.Scheduled) return double.PositiveInfinity;
+        double lockWake = editOrder.SecondsLeft(host.EditSeconds) > 0 ? Math.Min(1,editOrder.SecondsLeft(host.EditSeconds)) : double.PositiveInfinity;
+        if (t.Running || t.Waiting || t.Scheduled) return lockWake;
         double Boundary(double offset) {
             double seconds = (host.Now.AddSeconds(offset).Ticks % TimeSpan.TicksPerMinute)/(double)TimeSpan.TicksPerSecond;
             return seconds < 30 ? 30-seconds : 90-seconds;
         }
-        return Math.Min(Boundary(0),Math.Min(Boundary(t.Remaining),Boundary(t.Remaining + (t.IsFocus ? t.Rest : 0))));
+        return Math.Min(lockWake,Math.Min(Boundary(0),Math.Min(Boundary(t.Remaining),Boundary(t.Remaining + (t.IsFocus ? t.Rest : 0)))));
     }
     internal void Note(string text) { note.Text = text; note.Foreground = UiTheme.Muted; inputError.Visibility = Visibility.Collapsed; }
     private void UpdateClicked()

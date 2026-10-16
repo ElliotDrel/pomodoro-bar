@@ -8,6 +8,11 @@ See [the request checklist](REQUEST-CHECKLIST.md) for the complete feature revie
 
 ## [Unreleased]
 
+- Accept compact four-digit clock times such as `1000` (10:00), `0930`, `1000 PM`, and `tomorrow 0015`. Keep partial numeric input unapplied until all four digits are present.
+- Preserve time-field edit order for eight seconds after each valid change, across focus changes and Enter. Show the priority order and unlock countdown. Earlier endpoints stay fixed when subsequent duration edits move the start or change the break; reject conflicting edits without applying them.
+- Preserve independently chosen focus/break ratios when adding minutes, rounded to whole minutes; presets retain 25/5 and 50/10. This supersedes fixed 5:1 additions. Add parser, ordered-edit, expiry, conflict, scheduling, custom-ratio, and persistence regression coverage.
+- Verify 270 native app assertions, 27 updater assertions, eight changelog assertions, Dev/Release builds, silent Dev startup, and captured editor layouts. Clear edit order when advancing phases; changing break duration preserves a running focus deadline.
+
 - Trim the deploy skill to a precise trigger, Dev command, and publish/restart/verify flow. Remove repeated policy and troubleshooting prose while retaining startup-update behavior, completion evidence, and the Windows AppData constraint. Documentation only; app code and release version are unchanged.
 
 - Simplify routine deployment to publish through CI, run the installed `--restart` once, and verify the expected running version. Remove duplicate local packaging/smoke checks and routine reinstalls/shortcut repair. Document that restart only relaunches and normal startup handles updating; no app flags or updater code changed.

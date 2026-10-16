@@ -70,7 +70,7 @@ See [CHANGELOG.md](CHANGELOG.md) for dated Dev/Prod changes between versions. Th
 
 - [ ] Select **30 minutes** and confirm `25:00` focus plus `05:00` break.
 - [ ] Select **60 minutes** and confirm `50:00` focus plus `10:00` break.
-- [ ] Use `+1`, `+5`, or `+10` minutes and confirm the total increases; these controls approximate the original `5:1` split in whole minutes while preserving total minutes.
+- [ ] Use `+1`, `+5`, or `+10` minutes and confirm the total increases; these controls preserve the current custom focus/break ratio in whole minutes while preserving total minutes.
 - [ ] Watch countdown colors change continuously from white through green, yellow, orange, and red as time runs low.
 - [ ] Check the 30-minute preset reminders at 10 and 5 minutes of focus remaining, corresponding to 40% and 20% of focus duration.
 - [ ] Check the 60-minute preset reminders at 30, 10, and 5 minutes of focus remaining, corresponding to 60%, 20%, and 10% of focus duration.
@@ -105,4 +105,6 @@ See [CHANGELOG.md](CHANGELOG.md) for dated Dev/Prod changes between versions. Th
 
 - [ ] Verify both durations can be independently edited, including 23 minutes focus / 7 minutes break. This is now implemented by the timeline editor.
 - [ ] Verify the active section counts down while the other field shows its configured duration.
-- Pending earlier proposal: preserve a manually chosen ratio when using additions. Current additions intentionally approximate the original 5:1 split in whole minutes; the latest request did not change this policy.
+- [ ] Preserve a manually chosen focus/break ratio when using additions (20/10 +30 becomes 40/20). This supersedes the earlier fixed 5:1 addition policy.
+- [ ] Enter compact four-digit clock times such as `1000`, `0930`, `1000 PM`, and `tomorrow 0015`; reject invalid `1260` and incomplete `100`.
+- [ ] Set focus end first, then focus duration within 8 seconds; preserve focus end and move the start. Check the visible edit-order countdown, cross-field persistence, timeout, conflicts, and custom break times.

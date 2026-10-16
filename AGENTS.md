@@ -11,7 +11,7 @@ Native C#/.NET 10 Windows app: WPF windows without a tray entry, Velopack instal
 
 - Use a thick progress outline instead of a circle. Uniformly scale countdown, controls, and hit targets down to 130 × 20 DIPs.
 - Mirror the active countdown in the editor without overwriting input. Apply valid duration/clock edits on each keystroke; round configured edits to minutes. Schedule future starts with a pink countdown, reject past starts with a red error and reset to now. Persist vertical bar orientation.
-- Presets: 30 total = 25/5; 60 total = 50/10. Additions preserve total minutes and reminder percentages with the nearest whole-minute 5:1 split; this supersedes exact fractional-minute additions.
+- Presets: 30 total = 25/5; 60 total = 50/10. Custom focus and break durations are independent. Additions preserve total minutes, reminder percentages, and the current custom ratio rounded to whole minutes; this supersedes fixed 5:1 additions. Time edits retain their priority order for eight seconds after the latest valid edit.
 - Assign sounds backward; completion loops until a bar interaction silences audio. Completion waits for acknowledgement; coalesce delayed reminders.
 - Audio/update work must not block the dispatcher.
 - Schedule visible countdown seconds and hidden milestones directly; do not reintroduce unconditional polling. Keep paused rounded end previews live, skip hidden/minimized UI, and animate alerts only on the visible bar. Catch up on resume/time changes and preserve drafts.
@@ -26,6 +26,7 @@ Native C#/.NET 10 Windows app: WPF windows without a tray entry, Velopack instal
 | --- | --- |
 | src/Core/ | Deadline and scheduled-start engine, settings, recovery/migration, color/layout math |
 | src/Core/ClockTime.cs | Rounded editable clock parsing, explicit next-day dates, and end-time formatting |
+| src/Core/EditOrder.cs | Eight-second ordered time-edit constraints and conflict validation |
 | src/BarWindow.cs | Horizontal/vertical floating countdown, perimeter progress, hit targets, moving, and native resizing |
 | src/ProgressOutline.cs | Shared thicker countdown-colored perimeter geometry and editor timer-panel frame |
 | src/EditorWindow.cs | Editable focus/break durations, scheduled start and timeline endpoints, play/skip, and orientation controls |
