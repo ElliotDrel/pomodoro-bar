@@ -16,6 +16,10 @@ internal static class Program
     private static extern uint GetDpiForSystem();
     [STAThread]
     public static int Main(string[] args)
+        => args.Contains("--startup-smoke",StringComparer.OrdinalIgnoreCase)
+            ? VerificationDesktop.Run(() => Run(args)) : Run(args);
+
+    private static int Run(string[] args)
     {
         VelopackApp.Build().SetLocator(Velopack.Locators.VelopackLocator.CreateDefaultForPlatform(new BackgroundUpdateProcess(), null))
             .SetAutoApplyOnStartup(false).Run();

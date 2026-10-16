@@ -28,7 +28,11 @@ internal static class Tests
     private static void Reject(Action action,string reason) { try { action(); } catch (ArgumentException) { count++; return; } throw new Exception(reason); }
     [STAThread]
     private static int Main(string[] args)
+        => args.Contains("--interactive-ui") ? Run(args) : VerificationDesktop.Run(() => Run(args));
+
+    private static int Run(string[] args)
     {
+        if (!args.Contains("--interactive-ui")) Check(VerificationDesktop.IsIsolated,"default verification is isolated from the input desktop");
         if (args.Contains("--resource-audit")) return ResourceAudit.Run(args);
         try {
             double now = 0;
@@ -213,6 +217,7 @@ internal static class Tests
         foreach(var window in new Window[] {host.Bar,host.Editor}) {
             Check(ReferenceEquals(window.Icon,AppIcon.Source),"window uses the bundled Pomodoro icon");
             var hwnd=new WindowInteropHelper(window).Handle;
+            if (VerificationDesktop.IsIsolated) Check(VerificationDesktop.ContainsWindow(hwnd),"native test window belongs to the private desktop");
             Check(SendMessage(hwnd,0x007f,new IntPtr(0),IntPtr.Zero)!=IntPtr.Zero,"Windows receives small taskbar icon");
             Check(SendMessage(hwnd,0x007f,new IntPtr(1),IntPtr.Zero)!=IntPtr.Zero,"Windows receives large window icon");
         }

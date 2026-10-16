@@ -40,6 +40,7 @@ Native C#/.NET 10 Windows app: WPF windows without a tray entry, Velopack instal
 | src/InstanceServer.cs | Current-user relaunch/restart IPC |
 | src/UpdateService.cs | Unified update/download/restart flow |
 | src/BackgroundUpdateProcess.cs | Explicit no-shell/no-console policy for restart and apply helpers |
+| src/VerificationDesktop.cs | Private non-input Windows desktop for background tests and startup smoke checks |
 | src/Audio.cs, sounds/ | Async Windows playback and bundled WAV chimes |
 | tests/ | Native engine, GUI, layout, migration and audio regression harness |
 | tests/UpdateFlowTests.cs | Fake-package updater regressions and a harmless real console-window suppression probe |
@@ -61,7 +62,7 @@ Native C#/.NET 10 Windows app: WPF windows without a tray entry, Velopack instal
 
 ## Verification and publishing
 
-Run `dotnet run --project tests/PomodoroBar.Tests.csproj -c Release`, Dev and Release builds, and `git diff --check` before committing. Tests require Windows and silent fake audio. Rebuild/relaunch native changes. Update README and the file map for changed controls/files.
+Run `dotnet run --project tests/PomodoroBar.Tests.csproj -c Release`, Dev and Release builds, and `git diff --check` before committing. Tests and `--startup-smoke` run on a private non-input Windows desktop by default, including captures and resource audits; fail rather than fall back to visible windows. Never run `--interactive-ui` unless Elliot explicitly asks for visible testing. Tests require Windows and silent fake audio. Rebuild/relaunch native changes through background startup smoke checks. Update README and the file map for changed controls/files.
 
 Read `.agents/skills/deploy/SKILL.md` when publishing. Use the user-requested branch and meaningful commits. Semver tags trigger CI/Velopack upload; verify public release and installed local Prod before closeout. Stop only session-owned Dev instances/scratch. Never delete backups without explicit per-file permission.
 

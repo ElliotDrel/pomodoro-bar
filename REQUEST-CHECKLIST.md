@@ -47,6 +47,8 @@ See [CHANGELOG.md](CHANGELOG.md) for dated Dev/Prod changes between versions. Th
 
 ### Windows and editing
 
+- [ ] Run the normal regression command and `--startup-smoke` while using another app: no test windows, taskbar entries, or focus changes on the working desktop. Screenshot captures still render. Isolation failures stop verification; only explicitly requested `--interactive-ui` runs are visible.
+
 - [ ] Launch from the desktop or installed app entry and confirm both the editor and always-on-top floating bar open.
 - [ ] Find both independent windows in the taskbar and Alt+Tab.
 - [ ] Close either window with **X** and confirm the other stays available; then close the last window and confirm the process exits, audio stops, and no tray/hidden-icons entry remains.

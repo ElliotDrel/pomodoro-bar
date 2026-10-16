@@ -8,6 +8,9 @@ See [the request checklist](REQUEST-CHECKLIST.md) for the complete feature revie
 
 ## [Unreleased]
 
+- Run the real WPF regression harness, screenshot captures, resource audits, and `--startup-smoke` on a private Windows desktop by default. Never switch to it or fall back to visible testing if isolation fails. Monitor the original desktop for visible windows from the verification process and verify native test windows belong to the private desktop. Retain explicit `--interactive-ui` for deliberately visible test runs; normal app launches are unchanged.
+- Verify 273 native app assertions and 27 updater assertions in background mode, rendered screenshot captures, Dev/Release builds, and private-desktop startup smoke. Sandboxed desktop access fails closed; ordinary Windows execution passes without exposing verification windows.
+
 - Accept compact four-digit clock times such as `1000` (10:00), `0930`, `1000 PM`, and `tomorrow 0015`. Keep partial numeric input unapplied until all four digits are present.
 - Preserve time-field edit order for eight seconds after each valid change, across focus changes and Enter. Show the priority order and unlock countdown. Earlier endpoints stay fixed when subsequent duration edits move the start or change the break; reject conflicting edits without applying them.
 - Preserve independently chosen focus/break ratios when adding minutes, rounded to whole minutes; presets retain 25/5 and 50/10. This supersedes fixed 5:1 additions. Add parser, ordered-edit, expiry, conflict, scheduling, custom-ratio, and persistence regression coverage.
