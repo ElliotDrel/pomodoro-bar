@@ -108,23 +108,23 @@ internal static class Tests
             Check(ClockTime.Parse("tomorrow 0015",wall)==midnight.AddDays(1).AddMinutes(15),"compact clock supports midnight tomorrow");
             foreach (string input in new[] { "100", "1260", "2400" }) Reject(()=>ClockTime.Parse(input,wall),"reject partial or invalid compact clock "+input);
             var order = new EditOrder();
-            var timeline = order.Apply(TimeField.FocusEnd,3600,[0,1500,300],0); order.Accept(0);
-            Near(timeline[1],3600,"first endpoint edit changes focus rather than start");
+            var timeline = order.Apply(TimeField.FocusEnd,3600,new(0,1500,300),0); order.Accept(0);
+            Near(timeline.Focus,3600,"first endpoint edit changes focus rather than start");
             timeline=order.Apply(TimeField.Focus,1800,timeline,2); order.Accept(2);
-            Near(timeline[0],1800,"end first then duration moves start");
-            Near(timeline[0]+timeline[1],3600,"earlier endpoint remains fixed");
+            Near(timeline.Start,1800,"end first then duration moves start");
+            Near(timeline.Start+timeline.Focus,3600,"earlier endpoint remains fixed");
             timeline=order.Apply(TimeField.BreakEnd,4200,timeline,3); order.Accept(3);
-            Near(timeline[2],600,"custom break endpoint respects earlier focus edits");
+            Near(timeline.Rest,600,"custom break endpoint respects earlier focus edits");
             Reject(()=>order.Apply(TimeField.Start,0,timeline,4),"conflicting fourth constraint rejected");
             Near(order.SecondsLeft(5),6,"invalid edit does not extend lock");
             timeline=order.Apply(TimeField.Start,0,timeline,11); order.Accept(11);
-            Near(timeline[0],0,"idle timeout releases earlier order");
-            order.Clear(); timeline=order.Apply(TimeField.BreakEnd,2400,[0,1500,300],20); order.Accept(20);
-            Near(timeline[1],1500,"break endpoint first preserves focus duration");
-            Near(timeline[2],900,"break endpoint first changes break duration");
+            Near(timeline.Start,0,"idle timeout releases earlier order");
+            order.Clear(); timeline=order.Apply(TimeField.BreakEnd,2400,new(0,1500,300),20); order.Accept(20);
+            Near(timeline.Focus,1500,"break endpoint first preserves focus duration");
+            Near(timeline.Rest,900,"break endpoint first changes break duration");
             timeline=order.Apply(TimeField.FocusEnd,1800,timeline,21); order.Accept(21);
-            Near(timeline[2],600,"focus endpoint respects prior break endpoint");
-            Near(timeline[0]+timeline[1]+timeline[2],2400,"break end stays pinned");
+            Near(timeline.Rest,600,"focus endpoint respects prior break endpoint");
+            Near(timeline.Start+timeline.Focus+timeline.Rest,2400,"break end stays pinned");
             Check(ClockTime.Parse("tomorrow 2:25 PM",wall.AddDays(1),wall)==wall.AddDays(1).AddMinutes(25),"explicit tomorrow does not add an extra day when editing tomorrow's endpoint");
             now=0;var endpointTimer=new TimerModel(1500,300,[40,20],()=>now);endpointTimer.Toggle();now=100;endpointTimer.Tick();endpointTimer.SetEndpoint(true,1440);
             Near(endpointTimer.Remaining,1440,"endpoint preserves exact deadline seconds");Near(endpointTimer.Focus,1560,"endpoint edit preserves elapsed focus when rounding total duration");
@@ -243,12 +243,14 @@ internal static class Tests
         host.Bar.SetResize(false);Check(host.Bar.WindowStyle==WindowStyle.None && host.Bar.ResizeMode==ResizeMode.NoResize,"resize disables frame");
         host.Bar.ResetSize();Near(host.Bar.Width,280,"reset width");Near(host.Bar.Height,52,"reset height");
         host.SetSession(30,[40,20]); host.Toggle();
-        void Edit(TextBox field,string text) {
+        void Edit(TextBox field,string text,bool singleRefresh=false) {
             Keyboard.ClearFocus(); Pump(); field.Focus(); Keyboard.Focus(field); Pump();
             field.RaiseEvent(new KeyboardFocusChangedEventArgs(Keyboard.PrimaryDevice,0,host.Editor,field) { RoutedEvent=Keyboard.GotKeyboardFocusEvent });
+            int before=host.Editor.SyncCount;
             field.Text = text;
+            if (singleRefresh) Check(host.Editor.SyncCount==before+1,"a valid edit refreshes the editor once after applying all related changes");
         }
-        Edit(host.Editor.TimeCard,"07:42");
+        Edit(host.Editor.TimeCard,"07:42",singleRefresh:true);
         Near(host.Timer.Remaining,480,"typing updates focus immediately and rounds to nearest minute");
         Check(host.Editor.FocusEndCard.Text==TimerModel.EstimatedEnd(host.Now,480).ToString("t"),"end field updates on keystroke");
         Check(host.Editor.TimeCard.Foreground==host.CountdownBrush && host.Editor.TimerPanel.ProgressColor==host.CountdownBrush,"running editor text and perimeter use the same changing color");

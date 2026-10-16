@@ -26,7 +26,7 @@ Native C#/.NET 10 Windows app: WPF windows without a tray entry, Velopack instal
 | --- | --- |
 | src/Core/ | Deadline and scheduled-start engine, settings, recovery/migration, color/layout math |
 | src/Core/ClockTime.cs | Rounded editable clock parsing, explicit next-day dates, and end-time formatting |
-| src/Core/EditOrder.cs | Eight-second ordered time-edit constraints and conflict validation |
+| src/Core/EditOrder.cs | Eight-second edit order and the two start/duration/end relationships |
 | src/BarWindow.cs | Horizontal/vertical floating countdown, perimeter progress, hit targets, moving, and native resizing |
 | src/ProgressOutline.cs | Shared thicker countdown-colored perimeter geometry and editor timer-panel frame |
 | src/EditorWindow.cs | Editable focus/break durations, scheduled start and timeline endpoints, play/skip, and orientation controls |

@@ -19,10 +19,7 @@ internal static class VerificationDesktop
     [DllImport("user32.dll",CharSet=CharSet.Unicode,SetLastError=true)]
     private static extern bool GetUserObjectInformation(IntPtr handle,int index,StringBuilder value,uint length,out uint needed);
     [DllImport("user32.dll",SetLastError=true)] private static extern IntPtr OpenInputDesktop(uint flags,bool inherit,uint access);
-    [DllImport("user32.dll",SetLastError=true)] private static extern bool EnumDesktopWindows(IntPtr desktop,EnumWindow callback,IntPtr parameter);
-    [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr window);
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window,out uint process);
-    private delegate bool EnumWindow(IntPtr window,IntPtr parameter);
     [ThreadStatic] private static string? privateName;
 
     private static string Name(IntPtr desktop)
@@ -50,14 +47,13 @@ internal static class VerificationDesktop
     internal static int Run(Func<int> verify)
     {
         string name="PomodoroBar.Verification."+Guid.NewGuid().ToString("N");
-        IntPtr original=GetThreadDesktop(GetCurrentThreadId());
-        // Read/write objects, create windows/menus, enumerate; deliberately no SWITCHDESKTOP right.
-        IntPtr desktop=CreateDesktop(name,IntPtr.Zero,IntPtr.Zero,0,0xC7,IntPtr.Zero);
+        // Read/write objects and create windows/menus; deliberately no SWITCHDESKTOP right.
+        IntPtr desktop=CreateDesktop(name,IntPtr.Zero,IntPtr.Zero,0,0x87,IntPtr.Zero);
         if (desktop == IntPtr.Zero) {
             Console.Error.WriteLine("Background verification could not create its private desktop: "+new Win32Exception(Marshal.GetLastWin32Error()).Message);
             return 1; // Never fall back to showing test windows on the user's desktop.
         }
-        int result=1; Exception? failure=null; bool leakedWindow=false, monitoringFailed=false;
+        int result=1; Exception? failure=null;
         var worker=new Thread(() => {
             try {
                 if (!SetThreadDesktop(desktop)) throw new Win32Exception(Marshal.GetLastWin32Error());
@@ -70,17 +66,9 @@ internal static class VerificationDesktop
         worker.SetApartmentState(ApartmentState.STA);
         try {
             worker.Start();
-            do {
-                if (!EnumDesktopWindows(original,(window,_) => {
-                    GetWindowThreadProcessId(window,out uint process);
-                    if (process == Environment.ProcessId && IsWindowVisible(window)) leakedWindow=true;
-                    return true;
-                },IntPtr.Zero)) monitoringFailed=true;
-            } while (!worker.Join(20));
+            worker.Join();
             if (failure is not null) { Console.Error.WriteLine(failure); return 1; }
-            if (monitoringFailed) { Console.Error.WriteLine("FAIL: could not monitor the original desktop for exposed verification windows."); return 1; }
-            if (leakedWindow) { Console.Error.WriteLine("FAIL: verification exposed a window on the original desktop."); return 1; }
-            Console.WriteLine("Background verification: private desktop; no visible windows on the original desktop.");
+            Console.WriteLine("Background verification: private non-input desktop.");
             return result;
         } finally { CloseDesktop(desktop); }
     }

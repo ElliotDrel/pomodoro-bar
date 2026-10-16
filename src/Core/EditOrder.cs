@@ -5,64 +5,63 @@ namespace PomodoroBar.Core;
 
 public enum TimeField { Start, Focus, Break, FocusEnd, BreakEnd }
 
-// Keep earlier edits ahead of later edits, then fill free variables from the current timeline.
+public readonly record struct EditTimeline(double Start,double Focus,double Rest)
+{
+    public double Read(TimeField field) => field switch {
+        TimeField.Start => Start, TimeField.Focus => Focus, TimeField.Break => Rest,
+        TimeField.FocusEnd => Start+Focus, _ => Start+Focus+Rest };
+}
+
 public sealed class EditOrder
 {
     public const double IdleSeconds = 8;
-    private readonly List<TimeField> order = [];
+    private List<(TimeField Field,double Value)> order = [], pending = [];
     private double expires;
-    private List<TimeField> pending = [];
-    private readonly Dictionary<TimeField,double> values = new();
-    private Dictionary<TimeField,double> pendingValues = new();
-    public void Accept(double now) { order.Clear(); order.AddRange(pending); values.Clear(); foreach (var pair in pendingValues) values.Add(pair.Key,pair.Value); expires=now+IdleSeconds; }
-    public void Clear() { order.Clear(); values.Clear(); expires = 0; }
+    // Only commit the order after the controller has validated and applied the timeline.
+    public void Accept(double now) { order=pending; expires=now+IdleSeconds; }
+    public void Clear() { order=[]; pending=[]; expires=0; }
     public double SecondsLeft(double now) => order.Count == 0 ? 0 : Math.Max(0,expires-now);
-    public string Description => string.Join(" → ",order.ConvertAll(f => f switch {
+    public string Description => string.Join(" → ",order.ConvertAll(edit => edit.Field switch {
         TimeField.Start => "start", TimeField.Focus => "focus duration", TimeField.Break => "break duration",
         TimeField.FocusEnd => "focus end", _ => "break end" }));
 
-    public double[] Apply(TimeField field,double value,double[] current,double now)
+    public EditTimeline Apply(TimeField field,double value,EditTimeline current,double now)
     {
         if (now >= expires) Clear();
-        var next = new List<TimeField>(order);
-        if (!next.Contains(field)) next.Add(field);
-        var rows = new List<double[]>();
-        double[] Coefficients(TimeField f) => f switch {
-            TimeField.Start => [1,0,0], TimeField.Focus => [0,1,0], TimeField.Break => [0,0,1],
-            TimeField.FocusEnd => [1,1,0], _ => [1,1,1] };
-        double Read(TimeField f) { var c = Coefficients(f); return c[0]*current[0]+c[1]*current[1]+c[2]*current[2]; }
+        var next = new List<(TimeField Field,double Value)>(order);
+        int index=next.FindIndex(edit => edit.Field == field);
+        if (index < 0) next.Add((field,value)); else next[index]=(field,value);
+        var known=new Dictionary<TimeField,double>();
+
+        // Each relationship is simply left + duration = right.
+        bool Complete(TimeField left,TimeField duration,TimeField right)
+        {
+            bool hasLeft=known.TryGetValue(left,out double a), hasDuration=known.TryGetValue(duration,out double b), hasRight=known.TryGetValue(right,out double c);
+            if (hasLeft && hasDuration && !hasRight) { known[right]=a+b; return true; }
+            if (hasLeft && hasRight && !hasDuration) { known[duration]=c-a; return true; }
+            if (hasDuration && hasRight && !hasLeft) { known[left]=c-b; return true; }
+            return false;
+        }
         bool Add(TimeField f,double target)
         {
-            var c = Coefficients(f); double[] row = [c[0],c[1],c[2],target];
-            foreach (var existing in rows) {
-                int pivot = Array.FindIndex(existing,0,3,x => Math.Abs(x) > .000001);
-                double factor = row[pivot];
-                for (int i=0;i<4;i++) row[i] -= factor*existing[i];
-            }
-            int p = Array.FindIndex(row,0,3,x => Math.Abs(x) > .000001);
-            if (p < 0) return Math.Abs(row[3]) < .01;
-            double divisor = row[p]; for (int i=0;i<4;i++) row[i] /= divisor;
-            foreach (var existing in rows) {
-                double factor = existing[p];
-                for (int i=0;i<4;i++) existing[i] -= factor*row[i];
-            }
-            rows.Add(row); return true;
+            if (known.TryGetValue(f,out double existing)) return Math.Abs(existing-target) < .01;
+            known[f]=target;
+            while (Complete(TimeField.Start,TimeField.Focus,TimeField.FocusEnd)
+                | Complete(TimeField.FocusEnd,TimeField.Break,TimeField.BreakEnd)) { }
+            return true;
         }
-        foreach (var f in next)
+        foreach (var (f,stored) in next) {
             // Durations follow an active countdown; clock endpoints remain absolute.
-            if (!Add(f,f == field ? value : f is TimeField.Focus or TimeField.Break ? Read(f) : values[f]))
-                throw new ArgumentException("That conflicts with earlier edits. Wait 8 seconds to start a new edit order.");
-        var defaults = field == TimeField.BreakEnd ? new[] { TimeField.Start,TimeField.Focus,TimeField.Break }
-            : new[] { TimeField.Start,TimeField.Break,TimeField.Focus };
-        foreach (var f in defaults) Add(f,Read(f));
-        double[] result = new double[3];
-        for (int i=rows.Count-1;i>=0;i--) {
-            var row=rows[i]; int p=Array.FindIndex(row,0,3,x => Math.Abs(x) > .000001);
-            result[p]=row[3]; for (int j=p+1;j<3;j++) result[p]-=row[j]*result[j];
+            double target=f == field ? value : f is TimeField.Focus or TimeField.Break ? current.Read(f) : stored;
+            if (!Add(f,target)) throw new ArgumentException("That conflicts with earlier edits. Wait 8 seconds to start a new edit order.");
         }
-        TimerModel.ValidateDuration(result[1]); TimerModel.ValidateDuration(result[2]);
-        pending = next;
-        pendingValues = new(values) { [field] = value };
+        // Preserve unedited values where possible: prefer keeping the start in place.
+        Add(TimeField.Start,current.Start);
+        if (field == TimeField.BreakEnd) { Add(TimeField.Focus,current.Focus); Add(TimeField.Break,current.Rest); }
+        else { Add(TimeField.Break,current.Rest); Add(TimeField.Focus,current.Focus); }
+        var result=new EditTimeline(known[TimeField.Start],known[TimeField.Focus],known[TimeField.Break]);
+        TimerModel.ValidateDuration(result.Focus); TimerModel.ValidateDuration(result.Rest);
+        pending=next;
         return result;
     }
 }
